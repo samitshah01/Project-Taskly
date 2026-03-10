@@ -1,0 +1,106 @@
+<nav class="navbar navbar-dark bg-dark">
+    <div class="container">
+        <a class="navbar-brand logo" href="{% url 'index' %}">
+            <i class="bi bi-bullseye me-2"></i>Taskly
+        </a>
+        <button class="btn text-white d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileNav"
+            aria-controls="mobileNav">
+            <i class="bi bi-list fs-3"></i>
+        </button>
+
+        <div class="d-none d-lg-flex ms-auto">
+            <ul class="navbar-nav flex-row">
+                {% if is_homepage %}
+                    <li class="nav-item mx-2">
+                        <a class="nav-link" href="#features"><i class="bi bi-kanban me-1"></i>Features</a>
+                    </li>
+                    <li class="nav-item mx-2">
+                        <a class="nav-link" href="#how-it-works"><i class="bi bi-lightning-charge me-1"></i>How it Works</a>
+                    </li>
+                    <li class="nav-item mx-2">
+                        <a class="nav-link" href="#cta"><i class="bi bi-play-btn me-1"></i>Get Started</a>
+                    </li>
+                {% else %}
+                    {% if request.session.user_id %}
+                        <li class="nav-item mx-2">
+                            <a class="nav-link" href="{% url 'dashboard' %}">
+                                <i class="bi bi-speedometer2 me-1"></i>Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item mx-2">
+                            <a class="nav-link" href="{% url 'logout' %}">
+                                <i class="bi bi-box-arrow-right me-1"></i>Logout
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="nav-item mx-2">
+                            <a class="nav-link" href="{% url 'login' %}">
+                                <i class="bi bi-box-arrow-in-right me-1"></i>Login
+                            </a>
+                        </li>
+                        <li class="nav-item mx-2">
+                            <a class="nav-link" href="{% url 'register' %}">
+                                <i class="bi bi-person-plus me-1"></i>Register
+                            </a>
+                        </li>
+                    {% endif %}
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<!-- Offcanvas Sidebar (Mobile) -->
+<div class="offcanvas offcanvas-start" tabindex="-1" id="mobileNav" aria-labelledby="mobileNavLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="mobileNavLabel">
+            <i class="bi bi-bullseye me-2"></i>Taskly
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body">
+        <ul class="navbar-nav">
+            {% if is_homepage %}
+                <li class="nav-item mb-2">
+                    <a class="nav-link" href="#features" data-bs-dismiss="offcanvas">
+                        <i class="bi bi-kanban me-1"></i>Features
+                    </a>
+                </li>
+                <li class="nav-item mb-2">
+                    <a class="nav-link" href="#how-it-works" data-bs-dismiss="offcanvas">
+                        <i class="bi bi-lightning-charge me-1"></i>How it Works
+                    </a>
+                </li>
+                <li class="nav-item mb-2">
+                    <a class="nav-link" href="#cta" data-bs-dismiss="offcanvas">
+                        <i class="bi bi-play-btn me-1"></i>Get Started
+                    </a>
+                </li>
+            {% else %}
+                {% if request.session.user_id %}
+                    <li class="nav-item mb-2">
+                        <a class="nav-link" href="{% url 'dashboard' %}" data-bs-dismiss="offcanvas">
+                            <i class="bi bi-speedometer2 me-1"></i>Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item mb-2">
+                        <a class="nav-link" href="{% url 'logout' %}" data-bs-dismiss="offcanvas">
+                            <i class="bi bi-box-arrow-right me-1"></i>Logout
+                        </a>
+                    </li>
+                {% else %}
+                    <li class="nav-item mb-2">
+                        <a class="nav-link" href="{% url 'login' %}" data-bs-dismiss="offcanvas">
+                            <i class="bi bi-box-arrow-in-right me-1"></i>Login
+                        </a>
+                    </li>
+                    <li class="nav-item mb-2">
+                        <a class="nav-link" href="{% url 'register' %}" data-bs-dismiss="offcanvas">
+                            <i class="bi bi-person-plus me-1"></i>Register
+                        </a>
+                    </li>
+                {% endif %}
+            {% endif %}
+        </ul>
+    </div>
+</div>

@@ -1,0 +1,84 @@
+{% extends 'components/base.html' %}
+
+{% block title %}Login - taskly{% endblock %}
+
+{% block content %}
+{% include 'components/navbar.html' with is_homepage=False %}
+<div class="login-wrapper">
+    <div class="container">
+        <div class="card login-card shadow-lg">
+            <div class="login-brand">
+                <h1><i class="bi bi-bullseye me-2"></i>Taskly</h1>
+                <p class="text-muted">Sign in to your account</p>
+            </div>
+
+            {% if messages %}
+            {% for message in messages %}
+            {% if message.tags == 'error' %}
+            <div class="alert alert-danger" role="alert">
+                {% else %}
+                <div class="alert alert-{{ message.tags }}" role="alert">
+                    {% endif %}
+                    {% if 'success' in message.tags %}
+                    <i class="bi bi-check-circle-fill me-2"></i>
+                    {% elif 'warning' in message.tags %}
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    {% elif 'error' in message.tags %}
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    {% endif %}
+                    {{ message }}
+                </div>
+                {% endfor %}
+                {% endif %}
+
+                <!-- Login form -->
+                <form id="loginForm" method="post" action="{% url 'login' %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-secondary border-secondary text-light">
+                                <i class="bi bi-envelope"></i>
+                            </span>
+                            <input type="email" class="form-control" id="email" name="email"
+                                placeholder="johndoe@gmail.com" required
+                                value="{{ request.POST.email|default_if_none:'' }}">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <label for="password" class="form-label">Password</label>
+                            <a href="{% url 'forgot_password' %}"
+                                class="form-text text-decoration-none text-muted">Forgot password?</a>
+                        </div>
+                        <div class="input-group">
+                            <span class="input-group-text bg-secondary border-secondary text-light">
+                                <i class="bi bi-lock"></i>
+                            </span>
+                            <input type="password" class="form-control" id="password" name="password"
+                                placeholder="••••••••" required>
+                            <button class="btn btn-outline-secondary border-secondary text-light" type="button"
+                                id="togglePassword" aria-label="Toggle password visibility">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="rememberMe" name="remember">
+                        <label class="form-check-label text-muted" for="rememberMe">Remember me</label>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">Sign In</button>
+                    </div>
+                </form>
+
+                <p class="text-center mt-4 mb-0 text-muted">Don't have an account? <a href="{% url 'register' %}"
+                        class="text-decoration-none text-light">Create an account</a></p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

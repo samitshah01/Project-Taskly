@@ -1,0 +1,28 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Taskly{% endblock %}</title>
+    {% include 'components/header_link.html' %}
+</head>
+
+<body class="bg-dark text-light">
+    {% include 'components/navbar.html' %}
+    
+    {% block content %}{% endblock %}
+
+    <div id="loaderOverlay" class="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-75 d-flex justify-content-center align-items-center" style="z-index: 1050; visibility: hidden; opacity: 0; transition: opacity 0.3s;" data-text="Loading...">
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;"></div>
+            <p id="loaderText" class="mt-3 text-light fw-bold">Loading...</p>
+        </div>
+    </div>
+    
+    {% include 'components/footer_link.html' %}
+    {% include 'components/footer.html' %}
+</body>
+
+</html>

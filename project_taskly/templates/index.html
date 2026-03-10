@@ -1,0 +1,66 @@
+{% extends 'components/base.html' %}
+
+{% block title %}Taskly - Project Management Tool{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <h1>Taskly</h1>
+    <p>Organize projects, track tasks, and boost your team's productivity in one workspace.</p>
+    <a href="{% url 'register' %}" class="btn btn-primary btn-lg">Get Started</a>
+</section>
+
+<section class="features" id="features">
+    <div class="feature-card">
+        <i class="bi bi-kanban"></i>
+        <h4>Task Boards</h4>
+        <p>Create, assign, and track tasks efficiently with intuitive boards.</p>
+    </div>
+    <div class="feature-card">
+        <i class="bi bi-people"></i>
+        <h4>Team Collaboration</h4>
+        <p>Collaborate in real-time and keep your team aligned on every project.</p>
+    </div>
+    <div class="feature-card">
+        <i class="bi bi-bar-chart-line"></i>
+        <h4>Analytics</h4>
+        <p>Monitor project progress and performance with detailed reports.</p>
+    </div>
+    <div class="feature-card">
+        <i class="bi bi-shield-lock"></i>
+        <h4>Secure Data</h4>
+        <p>Your workspace and data are fully secure and private.</p>
+    </div>
+</section>
+
+<section class="how-it-works" id="how-it-works">
+    <h2>How Taskly Works</h2>
+    <div class="steps">
+        <div class="step">
+            <i class="bi bi-person-plus"></i>
+            <h5>Sign Up</h5>
+            <p>Create your account and workspace quickly.</p>
+        </div>
+        <div class="step">
+            <i class="bi bi-kanban"></i>
+            <h5>Create Projects</h5>
+            <p>Organize your projects into boards and tasks.</p>
+        </div>
+        <div class="step">
+            <i class="bi bi-people"></i>
+            <h5>Collaborate</h5>
+            <p>Invite your team and assign tasks seamlessly.</p>
+        </div>
+        <div class="step">
+            <i class="bi bi-bar-chart-line"></i>
+            <h5>Track Progress</h5>
+            <p>Monitor progress and optimize workflow efficiently.</p>
+        </div>
+    </div>
+</section>
+
+<section class="cta" id="cta">
+    <h2>Start Managing Your Projects Today</h2>
+    <p>Join Taskly and streamline your team's workflow.</p>
+    <a href="{% url 'register' %}" class="btn btn-primary btn-lg">Create Your Workspace</a>
+</section>
+{% endblock %}

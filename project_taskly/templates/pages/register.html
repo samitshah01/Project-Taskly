@@ -1,0 +1,159 @@
+{% extends 'components/base.html' %}
+
+{% block title %}Register - taskly{% endblock %}
+
+{% block content %}
+{% include 'components/navbar.html' with is_homepage=False %}
+    <div class="register-wrapper">
+        <div class="container">
+            <div class="card register-card shadow-lg">
+                <div class="register-brand">
+                    <h1><i class="bi bi-bullseye me-2"></i>Taskly</h1>
+                    <p class="text-muted">Create your account</p>
+                </div>
+
+                {% if messages %}
+                    {% for message in messages %}
+                        {% if message.tags == 'error' %}
+                            <div class="alert alert-danger" role="alert">
+                        {% else %}
+                            <div class="alert alert-{{ message.tags }}" role="alert">
+                        {% endif %}
+                                {% if 'success' in message.tags %}
+                                    <i class="bi bi-check-circle-fill me-2"></i>
+                                {% elif 'warning' in message.tags %}
+                                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                {% elif 'error' in message.tags %}
+                                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                {% endif %}
+                                {{ message }}
+                            </div>
+                    {% endfor %}
+                {% endif %}
+
+                <form id="registerForm" method="POST" action="{% url 'register' %}">
+                    {% csrf_token %}
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="firstName" class="form-label">First Name</label>
+                            <input type="text" class="form-control" id="firstName" name="first_name" placeholder="John" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="lastName" class="form-label">Last Name</label>
+                            <input type="text" class="form-control" id="lastName" name="last_name" placeholder="Doe" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-secondary border-secondary text-light">
+                                <i class="bi bi-envelope"></i>
+                            </span>
+                            <input type="email" class="form-control" id="email" name="email" placeholder="john@example.com" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3 position-relative">
+                        <label for="password" class="form-label d-flex align-items-center position-relative">
+                            <span>Password</span>
+                            <i class="bi bi-info-circle ms-2 text-white-50" data-bs-toggle="tooltip" data-bs-placement="right" title="Password must be at least 8 characters long and include an uppercase, lowercase, number, and special character."></i>
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-secondary border-secondary text-light">
+                                <i class="bi bi-lock"></i>
+                            </span>
+                            <input type="password" class="form-control" id="password" name="password"
+                                placeholder="••••••••" required>
+                            <button class="btn btn-outline-secondary border-secondary text-light" type="button" id="togglePassword">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                        <small id="passwordStrength" class="form-text text-muted mt-1 d-block"></small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="confirmPassword" class="form-label">Confirm Password</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-secondary border-secondary text-light">
+                                <i class="bi bi-lock"></i>
+                            </span>
+                            <input type="password" class="form-control" id="confirmPassword" name="confirm_password"
+                                placeholder="••••••••" required>
+                        </div>
+                        <div id="passwordMatch" class="form-text text-danger d-none">
+                            Passwords do not match
+                        </div>
+                    </div>
+
+                    <div class="mb-4 form-check">
+                        <input type="checkbox" class="form-check-input" id="termsCheck" required>
+                        <label class="form-check-label" for="termsCheck">
+                            I agree to the
+                            <a href="#" class="text-decoration-none contd-color" data-bs-toggle="modal" data-bs-target="#termsModal">Terms</a>
+                            and
+                            <a href="#" class="text-decoration-none contd-color" data-bs-toggle="modal" data-bs-target="#privacyModal">Privacy Policy</a>.
+                        </label>
+                    </div>
+
+                    <div class="d-grid gap-2 mb-3">
+                        <button type="submit" class="btn btn-primary" id="registerButton" disabled>Create
+                            Account</button>
+                    </div>
+                </form>
+
+                <p class="text-center mt-4 mb-0 text-muted">
+                    Already have an account? <a href="{% url 'login' %}" class="text-decoration-none text-light">Sign in</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Terms of Service Modal -->
+    <div class="modal fade" id="termsModal" tabindex="-1" aria-labelledby="termsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content bg-dark text-light border-secondary shadow-lg">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title" id="termsModalLabel"><i class="bi bi-file-earmark-text me-2"></i>Terms of Service</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Welcome to <strong>Taskly</strong>, your project management tool. By creating an account, you agree to:</p>
+                <ul>
+                <li>Use the platform responsibly and not share confidential workspace data.</li>
+                <li>Allow Taskly to send essential notifications about project activity and updates.</li>
+                <li>Respect collaboration features and workspace permissions set by organization admins.</li>
+                </ul>
+                <p class="text-muted small mt-3">For full details, refer to our complete Terms of Service on the Taskly website.</p>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Close</button>
+            </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Privacy Policy Modal -->
+    <div class="modal fade" id="privacyModal" tabindex="-1" aria-labelledby="privacyModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content bg-dark text-light border-secondary shadow-lg">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title" id="privacyModalLabel"><i class="bi bi-shield-lock me-2"></i>Privacy Policy</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>At <strong>Taskly</strong>, your privacy is important to us. We:</p>
+                <ul>
+                <li>Store only essential account and workspace information.</li>
+                <li>Encrypt passwords and secure all communication with SSL.</li>
+                <li>Never sell or share your data with third parties.</li>
+                </ul>
+                <p class="text-muted small mt-3">Learn more about how we protect your data in our full Privacy Policy.</p>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Close</button>
+            </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
