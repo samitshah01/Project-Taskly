@@ -289,6 +289,15 @@ footer {
   color: grey !important;
 }
 
+.text-muted2 {
+  color: rgb(180, 180, 180);
+  font-weight: bold;
+}
+
+.contd-color-text {
+  color: #797979;
+}
+
 .login-wrapper {
   min-height: 100vh;
   display: flex;
@@ -369,4 +378,95 @@ footer {
 
 .contd-color:hover {
   color: #00b4d8;
+}
+
+/* Dashboard */
+.dashboard-wrapper {
+  display: flex;
+  margin-top: 70px;
+}
+
+.sidebar {
+  width: 240px;
+  min-height: calc(100vh - 70px);
+  background: #1F2433;
+  border-right: 1px solid rgba(255,255,255,0.1);
+  padding: 20px;
+  position: sticky;
+  top: 70px;
+}
+
+.sidebar-nav {
+  list-style: none;
+  padding: 0;
+}
+
+.sidebar-nav li {
+  margin-bottom: 10px;
+}
+
+.sidebar-nav a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #F1F1F1;
+  padding: 10px 12px;
+  border-radius: 6px;
+  transition: 0.2s;
+}
+
+.sidebar-nav a:hover,
+.sidebar-nav a.active {
+  background: #0077b6;
+  color: white;
+}
+
+.dashboard-main {
+  flex: 1;
+  padding: 30px;
+}
+
+.dashboard-card {
+  background: #1F2433;
+}
+
+.chart-placeholder {
+  height: 250px;
+  border: 2px dashed rgba(255,255,255,0.1);
+  border-radius: 8px;
+}
+
+.activity-feed {
+  list-style: none;
+  padding: 0;
+}
+
+.activity-feed li {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.priority-high {
+  background: #ff4d4d;
+}
+
+.priority-medium {
+  background: #ffc107;
+  color: black;
+}
+
+.priority-low {
+  background: #00b4d8;
+}
+
+@media (max-width: 992px) {
+
+  .sidebar {
+    display: none;
+  }
+
+  .dashboard-main {
+    padding: 20px;
+  }
+
 }
