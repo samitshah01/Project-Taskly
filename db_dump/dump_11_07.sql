@@ -226,8 +226,123 @@ CREATE TABLE IF NOT EXISTS `users` (
 
 -- Dumping data for table project_taskly.users: ~0 rows (approximately)
 
-/*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;
-/*!40101 SET SQL_MODE=IFNULL(@OLD_SQL_MODE, '') */;
-/*!40014 SET FOREIGN_KEY_CHECKS=IFNULL(@OLD_FOREIGN_KEY_CHECKS, 1) */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40111 SET SQL_NOTES=IFNULL(@OLD_SQL_NOTES, 1) */;
+CREATE TABLE IF NOT EXISTS `projects` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(255) NOT NULL,
+  `description` TEXT DEFAULT NULL,
+  `start_date` DATE NOT NULL,
+  `end_date` DATE DEFAULT NULL,
+  `budget` DECIMAL(12,2) NOT NULL,
+  `manager_id` INT(11) DEFAULT NULL,
+  `status` VARCHAR(20) DEFAULT 'planned',
+  `created_at` DATETIME DEFAULT NULL,
+  `updated_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `manager_id` (`manager_id`),
+  CONSTRAINT `projects_manager_fk`
+    FOREIGN KEY (`manager_id`) REFERENCES `users` (`id`)
+    ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `team_members` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `user_id` INT(11) NOT NULL,
+  `role` VARCHAR(100) DEFAULT NULL,
+  `joined_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `user_id` (`user_id`),
+  CONSTRAINT `team_members_user_fk`
+    FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `tasks` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `title` VARCHAR(255) NOT NULL,
+  `description` TEXT DEFAULT NULL,
+  `project_id` INT(11) NOT NULL,
+  `assigned_to_id` INT(11) DEFAULT NULL,
+  `status` VARCHAR(20) DEFAULT 'todo',
+  `priority` VARCHAR(10) DEFAULT 'medium',
+  `due_date` DATE DEFAULT NULL,
+  `created_at` DATETIME DEFAULT NULL,
+  `updated_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `project_id` (`project_id`),
+  KEY `assigned_to_id` (`assigned_to_id`),
+  CONSTRAINT `tasks_project_fk`
+    FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`)
+    ON DELETE CASCADE,
+  CONSTRAINT `tasks_user_fk`
+    FOREIGN KEY (`assigned_to_id`) REFERENCES `users` (`id`)
+    ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `task_comments` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `task_id` INT(11) NOT NULL,
+  `user_id` INT(11) NOT NULL,
+  `comment` TEXT NOT NULL,
+  `created_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `task_id` (`task_id`),
+  KEY `user_id` (`user_id`),
+  CONSTRAINT `task_comments_task_fk`
+    FOREIGN KEY (`task_id`) REFERENCES `tasks` (`id`)
+    ON DELETE CASCADE,
+  CONSTRAINT `task_comments_user_fk`
+    FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `project_files` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `project_id` INT(11) NOT NULL,
+  `uploaded_by_id` INT(11) DEFAULT NULL,
+  `file` VARCHAR(255) NOT NULL,
+  `uploaded_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `project_id` (`project_id`),
+  KEY `uploaded_by_id` (`uploaded_by_id`),
+  CONSTRAINT `project_files_project_fk`
+    FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`)
+    ON DELETE CASCADE,
+  CONSTRAINT `project_files_user_fk`
+    FOREIGN KEY (`uploaded_by_id`) REFERENCES `users` (`id`)
+    ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `expenses` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `project_id` INT(11) NOT NULL,
+  `amount` DECIMAL(10,2) NOT NULL,
+  `description` VARCHAR(255) NOT NULL,
+  `created_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `project_id` (`project_id`),
+  CONSTRAINT `expenses_project_fk`
+    FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `activity_logs` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `user_id` INT(11) NOT NULL,
+  `action` VARCHAR(255) NOT NULL,
+  `project_id` INT(11) DEFAULT NULL,
+  `task_id` INT(11) DEFAULT NULL,
+  `timestamp` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `user_id` (`user_id`),
+  KEY `project_id` (`project_id`),
+  KEY `task_id` (`task_id`),
+  CONSTRAINT `activity_logs_user_fk`
+    FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+    ON DELETE CASCADE,
+  CONSTRAINT `activity_logs_project_fk`
+    FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`)
+    ON DELETE CASCADE,
+  CONSTRAINT `activity_logs_task_fk`
+    FOREIGN KEY (`task_id`) REFERENCES `tasks` (`id`)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
