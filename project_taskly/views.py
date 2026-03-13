@@ -1,10 +1,9 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.utils import timezone
 from django.contrib.auth.hashers import check_password, make_password
 from django.views.decorators.csrf import csrf_protect
 from django.db.models import Sum
-
 from .models import Users, Project, Task, Expense, ActivityLog
 
 
@@ -128,6 +127,7 @@ def dashboard(request):
         return redirect('login')
 
     total_projects = Project.objects.count()
+    team_list = Users.objects.all()
 
     active_tasks = Task.objects.filter(
         status__in=["todo", "in_progress", "review"]
@@ -153,7 +153,149 @@ def dashboard(request):
         "budget_used": budget_used,
         "recent_tasks": recent_tasks,
         "recent_projects": recent_projects,
-        "recent_activities": recent_activities
+        "recent_activities": recent_activities,
+        "team_list": team_list
     }
 
     return render(request, 'pages/dashboard.html', context)
+
+def log_activity(user_id, action, project=None, task=None):
+    user = Users.objects.filter(id=user_id).first()
+
+    if user:
+        ActivityLog.objects.create(
+            user=user,
+            action=action,
+            project=project,
+            task=task,
+            timestamp=timezone.now()
+        )
+
+def projects(request):
+
+    projects = Project.objects.select_related("manager").all()
+    managers = Users.objects.all()
+
+    context = {
+        "projects": projects,
+        "managers": managers,
+        "total_projects": projects.count(),
+        "in_progress": projects.filter(status="in_progress").count(),
+        "completed": projects.filter(status="completed").count(),
+        "on_hold": projects.filter(status="on_hold").count(),
+        "active_page": "projects"
+    }
+
+    return render(request, "pages/projects.html", context)
+
+def create_project(request):
+
+    if request.method == "POST":
+
+        name = request.POST.get("name")
+        description = request.POST.get("description")
+        start_date = request.POST.get("start_date")
+        end_date = request.POST.get("end_date")
+        budget = request.POST.get("budget")
+        manager_id = request.POST.get("manager")
+        status = request.POST.get("status")
+
+        manager = Users.objects.filter(id=manager_id).first()
+
+        project = Project.objects.create(
+            name=name,
+            description=description,
+            start_date=start_date,
+            end_date=end_date if end_date else None,
+            budget=budget,
+            manager=manager,
+            status=status,
+            created_at=timezone.now(),
+            updated_at=timezone.now()
+        )
+
+        # Activity Log
+        log_activity(
+            request.session.get("user_id"),
+            f"Created project '{project.name}'",
+            project
+        )
+
+    return redirect("projects")
+
+def view_project(request, id):
+
+    project = get_object_or_404(Project, id=id)
+
+    context = {
+        "project": project,
+        "active_page": "projects"
+    }
+
+    return render(request, "pages/view_project.html", context)
+
+def edit_project(request, id):
+
+    project = get_object_or_404(Project, id=id)
+    managers = Users.objects.all()
+
+    if request.method == "POST":
+
+        project.name = request.POST.get("name")
+        project.description = request.POST.get("description")
+        project.start_date = request.POST.get("start_date")
+        project.end_date = request.POST.get("end_date")
+        project.budget = request.POST.get("budget")
+        project.status = request.POST.get("status")
+
+        manager_id = request.POST.get("manager")
+        project.manager = Users.objects.filter(id=manager_id).first()
+
+        project.updated_at = timezone.now()
+
+        project.save()
+
+        log_activity(
+            request.session.get("user_id"),
+            f"Updated project '{project.name}'",
+            project
+        )
+
+        messages.success(request, "Project updated successfully.")
+        return redirect("projects")
+
+    context = {
+        "project": project,
+        "managers": managers,
+        "active_page": "projects"
+    }
+
+    return render(request, "pages/edit_project.html", context)
+
+def delete_project(request, id):
+
+    project = get_object_or_404(Project, id=id)
+    project_name = project.name
+
+    log_activity(
+        request.session.get("user_id"),
+        f"Deleted project '{project_name}'",
+        project
+    )
+    project.delete()
+
+    messages.success(request, "Project deleted successfully.")
+
+    return redirect("projects")
+
+def settings(request):
+
+    user_id = request.session.get("user_id")
+    user = Users.objects.filter(id=user_id).first()
+
+    context = {
+        "user": user,
+        "active_page": "settings"
+    }
+
+    return render(request, "pages/settings.html", context)
