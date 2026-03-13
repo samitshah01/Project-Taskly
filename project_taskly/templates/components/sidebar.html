@@ -1,0 +1,16 @@
+<aside class="sidebar">
+    <ul class="sidebar-nav">
+
+        <li>
+            <a href="{% url 'dashboard' %}" class="{% if active_page == 'dashboard' %}active{% endif %}"> <i class="bi bi-speedometer2"></i> <span>Dashboard</span></a>
+        </li>
+
+        <li>
+            <a href="{% url 'projects' %}" class="{% if active_page == 'projects' %}active{% endif %}"> <i class="bi bi-kanban"></i> <span>Projects</span></a>
+        </li>
+
+        <li>
+            <a href="{% url 'settings' %}" class="{% if active_page == 'settings' %}active{% endif %}"> <i class="bi bi-gear"></i> <span>Settings</span></a>
+        </li>
+    </ul>
+</aside>

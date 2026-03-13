@@ -1,0 +1,151 @@
+{% extends 'components/base.html' %}
+
+{% block title %}Settings - Taskly{% endblock %}
+
+{% block content %}
+
+<div class="dashboard-wrapper">
+
+    <!-- SIDEBAR -->
+    {% include "components/sidebar.html" %}
+
+    <div class="container-fluid">
+
+        <div class="mb-4">
+            <h3 class="fw-bold text-light">Settings</h3>
+            <p class="text-muted mb-0">Manage your account settings</p>
+        </div>
+
+
+        <div class="row g-4">
+
+            <div class="col-lg-6">
+
+                <div class="card shadow-sm border-0">
+
+                    <div class="card-header bg-transparent">
+                        <h5 class="fw-bold mb-0 text-light">Profile Information</h5>
+                    </div>
+
+                    <div class="card-body">
+
+                        <form method="POST">
+                            {% csrf_token %}
+
+                            <div class="row">
+
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">First Name</label>
+                                    <input type="text" name="first_name" class="form-control text-muted" value="{{ user.first_name }}">
+                                </div>
+
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Last Name</label>
+                                    <input type="text" name="last_name" class="form-control text-muted" value="{{ user.last_name }}">
+                                </div>
+
+                                <div class="col-md-12 mb-3">
+                                    <label class="form-label">Email</label>
+                                    <input type="email" name="email" class="form-control text-muted" value="{{ user.email }}">
+                                </div>
+
+                                <div class="col-md-12 mb-3">
+                                    <label class="form-label">Role</label>
+                                    <input type="text" class="form-control bg-dark text-muted border-secondary" value="{{ user.role }}" disabled>
+                                </div>
+
+                            </div>
+
+                            <button class="btn btn-primary"> Update Profile </button>
+
+                        </form>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="col-lg-6">
+
+                <div class="card shadow-sm border-0">
+
+                    <div class="card-header bg-transparent">
+                        <h5 class="fw-bold mb-0 text-light">Change Password</h5>
+                    </div>
+
+                    <div class="card-body">
+
+                        <form method="POST">
+                            {% csrf_token %}
+
+                            <div class="mb-3">
+                                <label class="form-label">Current Password</label>
+                                <input type="password" name="current_password" class="form-control">
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">New Password</label>
+                                <input type="password" name="new_password" class="form-control">
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Confirm Password</label>
+                                <input type="password" name="confirm_password" class="form-control">
+                            </div>
+
+                            <button class="btn btn-warning">
+                                Update Password
+                            </button>
+
+                        </form>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="col-lg-12">
+
+                <div class="card shadow-sm border-0">
+
+                    <div class="card-header bg-transparent">
+                        <h5 class="fw-bold mb-0 text-light">Account Information</h5>
+                    </div>
+
+                    <div class="card-body">
+
+                        <div class="row">
+
+                            <div class="col-md-4">
+                                <h6 class="text-light">User ID</h6>
+                                <p class="fw-semibold text-muted">{{ user.id }}</p>
+                            </div>
+
+                            <div class="col-md-4">
+                                <h6 class="text-light">Email</h6>
+                                <p class="fw-semibold text-muted">{{ user.email }}</p>
+                            </div>
+
+                            <div class="col-md-4">
+                                <h6 class="text-light">Member Since</h6>
+                                <p class="fw-semibold text-muted">{{ user.created_at }}</p>
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

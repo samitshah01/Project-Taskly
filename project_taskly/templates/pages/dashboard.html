@@ -7,68 +7,7 @@
 <div class="dashboard-wrapper">
 
     <!-- SIDEBAR -->
-    <aside class="sidebar">
-        <ul class="sidebar-nav">
-
-            <li>
-                <a href="#" class="active">
-                    <i class="bi bi-speedometer2"></i>
-                    <span>Dashboard</span>
-                </a>
-            </li>
-            <!--
-            <li>
-                <a href="#">
-                    <i class="bi bi-bar-chart"></i>
-                    <span>Analytics</span>
-                </a>
-            </li>
-
-            <li>
-                <a href="#">
-                    <i class="bi bi-check2-square"></i>
-                    <span>My Tasks</span>
-                </a>
-            </li> -->
-
-            <li>
-                <a href="#">
-                    <i class="bi bi-kanban"></i>
-                    <span>Projects</span>
-                </a>
-            </li>
-            <!--
-            <li>
-                <a href="#">
-                    <i class="bi bi-people"></i>
-                    <span>Team Members</span>
-                </a>
-            </li>
-
-            <li>
-                <a href="#">
-                    <i class="bi bi-folder"></i>
-                    <span>Files</span>
-                </a>
-            </li>
-
-            <li>
-                <a href="#">
-                    <i class="bi bi-clipboard-data"></i>
-                    <span>Reports</span>
-                </a>
-            </li> -->
-
-            <li>
-                <a href="#">
-                    <i class="bi bi-gear"></i>
-                    <span>Settings</span>
-                </a>
-            </li>
-
-        </ul>
-    </aside>
-
+    {% include "components/sidebar.html" %}
 
     <main class="dashboard-main container-fluid">
         <div class="mb-4">
@@ -150,100 +89,146 @@
         <!-- TASKS + PROJECTS -->
         <div class="row g-4">
 
-            <div class="col-lg-6">
-                <div class="card p-4">
+        <!-- TASKS -->
+        <div class="col-lg-4">
+            <div class="card p-4">
 
-                    <h5 class="mb-3 text-muted2">Recent Tasks</h5>
+                <h5 class="mb-3 text-muted2">Recent Tasks</h5>
 
-                    <table class="table table-dark table-hover">
+                <table class="table table-dark table-hover">
 
-                        <thead>
-                            <tr>
-                                <th>Task</th>
-                                <th>Status</th>
-                                <th>Priority</th>
-                            </tr>
-                        </thead>
+                    <thead>
+                        <tr>
+                            <th>Task</th>
+                            <th>Status</th>
+                            <th>Priority</th>
+                        </tr>
+                    </thead>
 
-                        <tbody>
-                            {% for task in recent_tasks %}
-                            <tr>
-                                <td>{{ task.title }}</td>
-                                <td>
-                                    <span class="badge 
-                                        {% if task.status == 'todo' %}bg-secondary
-                                        {% elif task.status == 'in_progress' %}bg-warning
-                                        {% elif task.status == 'review' %}bg-info
-                                        {% elif task.status == 'done' %}bg-success
-                                        {% endif %}">
-                                        {{ task.get_status_display }}
-                                    </span>
-                                </td>
-                                <td>
-                                    <span class="badge
-                                        {% if task.priority == 'high' %}priority-high
-                                        {% elif task.priority == 'medium' %}priority-medium
-                                        {% else %}priority-low
-                                        {% endif %}">
-                                        {{ task.get_priority_display }}
-                                    </span>
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="3" class="text-center text-muted2">
-                                    No tasks found
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="col-lg-6">
-                <div class="card p-4">
-
-                    <h5 class="mb-3 text-muted2">Projects</h5>
-
-                    <table class="table table-dark table-hover">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Status</th>
-                                <th>Budget</th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-                            {% for project in recent_projects %}
-                            <tr>
-                                <td>{{ project.name }}</td>
-                                <td>
-                                    <span class="badge
-                                    {% if project.status == 'planned' %}bg-warning
-                                    {% elif project.status == 'in_progress' %}bg-primary
-                                    {% elif project.status == 'on_hold' %}bg-danger
-                                    {% elif project.status == 'completed' %}bg-success
+                    <tbody>
+                        {% for task in recent_tasks %}
+                        <tr>
+                            <td>{{ task.title }}</td>
+                            <td>
+                                <span class="badge 
+                                    {% if task.status == 'todo' %}bg-secondary
+                                    {% elif task.status == 'in_progress' %}bg-warning
+                                    {% elif task.status == 'review' %}bg-info
+                                    {% elif task.status == 'done' %}bg-success
                                     {% endif %}">
-                                    {{ project.get_status_display }}
-                                    </span>
-                                </td>
+                                    {{ task.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge
+                                    {% if task.priority == 'high' %}priority-high
+                                    {% elif task.priority == 'medium' %}priority-medium
+                                    {% else %}priority-low
+                                    {% endif %}">
+                                    {{ task.get_priority_display }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3" class="text-center text-muted2">
+                                No tasks found
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
 
-                                <td>${{ project.budget }}</td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="3" class="text-center text-muted2">
-                                    No projects found
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+                </table>
+
             </div>
         </div>
+
+
+        <!-- PROJECTS -->
+        <div class="col-lg-4">
+            <div class="card p-4">
+
+                <h5 class="mb-3 text-muted2">Projects</h5>
+
+                <table class="table table-dark table-hover">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Status</th>
+                            <th>Budget</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for project in recent_projects %}
+                        <tr>
+                            <td>{{ project.name }}</td>
+                            <td>
+                                <span class="badge
+                                {% if project.status == 'planned' %}bg-warning
+                                {% elif project.status == 'in_progress' %}bg-primary
+                                {% elif project.status == 'on_hold' %}bg-danger
+                                {% elif project.status == 'completed' %}bg-success
+                                {% endif %}">
+                                {{ project.get_status_display }}
+                                </span>
+                            </td>
+
+                            <td>${{ project.budget }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3" class="text-center text-muted2">
+                                No projects found
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+            </div>
+        </div>
+
+
+        <!-- TEAM MEMBERS -->
+        <div class="col-lg-4">
+            <div class="card p-4">
+
+                <h5 class="mb-3 text-muted2">Team Members</h5>
+
+                <ul class="list-group list-group-flush">
+
+                    {% for member in team_list %}
+
+                    <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center contd-color-text">
+
+                        <div>
+                            <strong>{{ member.first_name }} {{ member.last_name }}</strong>
+                            <br>
+                        </div>
+
+                        {% if member.managed_projects.count %}
+                        <span class="badge bg-primary">
+                            Manager
+                        </span>
+                        {% endif %}
+
+                    </li>
+
+                    {% empty %}
+
+                    <li class="list-group-item text-muted2">
+                        No team members found
+                    </li>
+
+                    {% endfor %}
+
+                </ul>
+
+            </div>
+        </div>
+
+    </div>
     </main>
 </div>
 {% endblock %}
