@@ -1,0 +1,18 @@
+{% load static %}
+
+<div id="toast-container"></div>
+
+{% if messages %}
+  <script id="django-messages" type="application/json">
+  [
+    {% for m in messages %}
+    {
+      "type": "{{ m.tags|escapejs }}",
+      "text": "{{ m.message|escapejs }}"
+    }
+    {% if not forloop.last %},{% endif %}
+    {% endfor %}
+  ]
+  </script>
+{% endif %}
+<script src="{% static 'js/toast_notify.js' %}"></script>

@@ -42,105 +42,61 @@ document.addEventListener("DOMContentLoaded", function () {
         window.history.replaceState(null, null, window.location.href);
     }
 
-    // Login Form
-    try {
-        const loginForm = document.getElementById('loginForm');
-        const loginPasswordInput = document.querySelector('#loginForm #password');
-        const loginTogglePassword = document.querySelector('#loginForm #togglePassword');
+    // Navbar Toggle
+    const navToggle = document.getElementById('navToggle');
+    const navLinks = document.getElementById('navLinks');
 
-        if (loginForm) {
-            loginForm.addEventListener('submit', () => Loader.show('Signing in...'));
+    let overlay = document.querySelector('.nav-overlay');
+
+    if (navToggle && navLinks) {
+
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.className = 'nav-overlay';
+            document.body.appendChild(overlay);
         }
 
-        if (loginPasswordInput && loginTogglePassword) {
-            loginTogglePassword.addEventListener('click', function () {
-                const type = loginPasswordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-                loginPasswordInput.setAttribute('type', type);
-                const icon = this.querySelector('i');
-                if (icon) {
-                    icon.classList.toggle('bi-eye');
-                    icon.classList.toggle('bi-eye-slash');
-                }
+        navToggle.addEventListener('click', () => {
+            navLinks.classList.toggle('open');
+            overlay.classList.toggle('active');
+
+            navToggle.innerHTML = navLinks.classList.contains('open')
+                ? '<i class="bi bi-x-lg"></i>'
+                : '<i class="bi bi-list"></i>';
+        });
+
+        if (overlay) {
+            overlay.addEventListener('click', () => {
+                navLinks.classList.remove('open');
+                overlay.classList.remove('active');
+                navToggle.innerHTML = '<i class="bi bi-list"></i>';
             });
         }
-    } catch (err) {
-        console.error('Login script error:', err);
+
+        const navAnchors = navLinks.querySelectorAll('a');
+        if (navAnchors.length > 0) {
+            navAnchors.forEach(a => {
+                a.addEventListener('click', () => {
+                    navLinks.classList.remove('open');
+                    overlay.classList.remove('active');
+                    navToggle.innerHTML = '<i class="bi bi-list"></i>';
+                });
+            });
+        }
     }
 
-    // Register Form
-    try {
-        const registerForm = document.getElementById('registerForm');
-        const registerPasswordInput = document.querySelector('#registerForm #password');
-        const confirmInput = document.querySelector('#registerForm #confirmPassword');
-        const registerTogglePassword = document.querySelector('#registerForm #togglePassword');
-        const registerButton = document.querySelector('#registerForm #registerButton');
-        const passwordMatchText = document.querySelector('#registerForm #passwordMatch');
-        const strengthText = document.querySelector('#registerForm #passwordStrength');
-        const termsCheck = document.querySelector('#registerForm #termsCheck');
+    // Scroll Reveal
+    const revealElements = document.querySelectorAll('.reveal');
 
-        if (registerForm && registerPasswordInput && confirmInput && registerTogglePassword && registerButton) {
-            let agreed = termsCheck ? termsCheck.checked : true;
-
-            if (termsCheck) {
-                termsCheck.addEventListener('change', function () {
-                    agreed = termsCheck.checked;
-                    checkFormValidity();
-                });
-            }
-
-            registerTogglePassword.addEventListener('click', () => {
-                const isPasswordType = registerPasswordInput.getAttribute('type') === 'password';
-                registerPasswordInput.setAttribute('type', isPasswordType ? 'text' : 'password');
-                confirmInput.setAttribute('type', isPasswordType ? 'text' : 'password');
-                registerTogglePassword.innerHTML = isPasswordType
-                    ? '<i class="bi bi-eye-slash"></i>'
-                    : '<i class="bi bi-eye"></i>';
-            });
-
-            registerPasswordInput.addEventListener('input', () => {
-                const val = registerPasswordInput.value;
-                let strength = 0;
-                if (val.length >= 8) strength++;
-                if (/[A-Z]/.test(val)) strength++;
-                if (/[a-z]/.test(val)) strength++;
-                if (/\d/.test(val)) strength++;
-                if (/[!@#$%^&*(),.?":{}|<>]/.test(val)) strength++;
-
-                if (val.length === 0) strengthText.textContent = '';
-                else if (strength <= 2) {
-                    strengthText.textContent = 'Weak password';
-                    strengthText.className = 'form-text text-danger mt-1 d-block';
-                } else if (strength <= 4) {
-                    strengthText.textContent = 'Medium password';
-                    strengthText.className = 'form-text text-warning mt-1 d-block';
-                } else {
-                    strengthText.textContent = 'Strong password';
-                    strengthText.className = 'form-text text-success mt-1 d-block';
+    if (revealElements.length > 0 && 'IntersectionObserver' in window) {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(e => {
+                if (e.isIntersecting) {
+                    e.target.classList.add('visible');
                 }
-
-                checkFormValidity();
             });
+        }, { threshold: 0.12 });
 
-            confirmInput.addEventListener('input', () => {
-                if (confirmInput.value !== registerPasswordInput.value && confirmInput.value !== '') {
-                    passwordMatchText.classList.remove('d-none');
-                } else {
-                    passwordMatchText.classList.add('d-none');
-                }
-                checkFormValidity();
-            });
-
-            function checkFormValidity() {
-                const strong = strengthText.textContent === 'Strong password';
-                const match = registerPasswordInput.value === confirmInput.value && registerPasswordInput.value !== '';
-                registerButton.disabled = !(strong && match && agreed);
-            }
-
-            checkFormValidity();
-
-            registerForm.addEventListener('submit', () => Loader.show('Creating account...'));
-        }
-    } catch (err) {
-        console.error('Register script error:', err);
+        revealElements.forEach(el => observer.observe(el));
     }
 });

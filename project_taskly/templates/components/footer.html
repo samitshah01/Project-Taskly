@@ -1,5 +1,17 @@
-<footer>
-    &copy; {% now "Y" %} Taskly. All rights reserved. | 
-    <a href="{% url 'terms' %}">Terms</a> | 
-    <a href="{% url 'privacy' %}">Privacy</a>
+{% load static %}
+
+<footer class="site-footer">
+    <a href="#" class="footer-logo">
+        <div class="nav-logo-icon">
+            <img src="{% static 'images/logo/logo.png' %}" alt="Taskly Logo">
+        </div>
+        Taskly
+    </a>
+
+    <div class="footer-links">
+        <a href="#">Privacy</a>
+        <a href="#">Terms</a>
+    </div>
+
+    <span class="footer-copy">© 2025 Taskly. All rights reserved.</span>
 </footer>

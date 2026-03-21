@@ -1,66 +1,207 @@
 {% extends 'components/base.html' %}
 
+{% load static %}
+
 {% block title %}Taskly - Project Management Tool{% endblock %}
 
 {% block content %}
-<section class="hero">
-    <h1>Taskly</h1>
-    <p>Organize projects, track tasks, and boost your team's productivity in one workspace.</p>
-    <a href="{% url 'register' %}" class="btn btn-primary btn-lg">Get Started</a>
+
+<section class="hero-section">
+    <div class="hero-inner">
+        <div>
+            <h1 class="hero-headline fade-up fade-up-d1">
+                Ship Projects <span class="grad">Faster,</span><br>Together.
+            </h1>
+            <p class="hero-sub fade-up fade-up-d2">
+                Taskly brings your team's tasks, timelines, and conversations into one calm workspace — so you spend
+                less time managing and more time building.
+            </p>
+            <div class="hero-actions fade-up fade-up-d3">
+                <a href="{% url 'register' %}" class="btn-cta-primary">
+                    Get Started <i class="bi bi-arrow-right"></i>
+                </a>
+                <a href="#features" class="btn-cta-ghost">
+                    <i class="bi bi-play-circle"></i> See how it works
+                </a>
+            </div>
+        </div>
+
+        <div class="hero-visual fade-up fade-up-d2">
+            <div class="hero-visual-card">
+
+                <div class="float-chip fc1">
+                    <i class="bi bi-check-circle-fill" style="color:var(--low);font-size:14px;"></i>
+                    Task completed!
+                </div>
+                <div class="float-chip fc2">
+                    <i class="bi bi-bell-fill" style="color:var(--accent);font-size:13px;"></i>
+                    Deadline tomorrow
+                </div>
+
+                <div class="mini-topbar">
+                    <div class="mini-logo"><img src="{% static 'images/logo/logo.png' %}" alt="Taskly Logo" srcset=""></div>
+                    <span class="mini-title">Taskly</span>
+                    <span class="mini-badge">Sprint 4</span>
+                </div>
+
+                <div class="mini-columns">
+                    <div>
+                        <div class="mini-col-hdr">
+                            <span class="mini-col-dot" style="background:var(--accent2);"></span> To Do
+                        </div>
+                        <div class="mini-task">
+                            Design system setup
+                            <div><span class="mini-task-tag h">High</span></div>
+                        </div>
+                        <div class="mini-task">
+                            Write unit tests
+                            <div><span class="mini-task-tag m">Medium</span></div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <div class="mini-col-hdr">
+                            <span class="mini-col-dot" style="background:var(--accent);"></span> In Progress
+                        </div>
+                        <div class="mini-task">
+                            Auth module
+                            <div><span class="mini-task-tag h">High</span></div>
+                        </div>
+                        <div class="mini-task">
+                            Dashboard UI
+                            <div><span class="mini-task-tag m">Medium</span></div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <div class="mini-col-hdr">
+                            <span class="mini-col-dot" style="background:var(--low);"></span> Done
+                        </div>
+                        <div class="mini-task" style="opacity:0.7;">
+                            <span style="text-decoration:line-through;">Kickoff meeting</span>
+                            <div><span class="mini-task-tag l">Low</span></div>
+                        </div>
+                        <div class="mini-task" style="opacity:0.7;">
+                            <span style="text-decoration:line-through;">DB schema</span>
+                            <div><span class="mini-task-tag l">Done</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
 </section>
 
-<section class="features" id="features">
-    <div class="feature-card">
-        <i class="bi bi-kanban"></i>
-        <h4>Task Boards</h4>
-        <p>Create, assign, and track tasks efficiently with intuitive boards.</p>
-    </div>
-    <div class="feature-card">
-        <i class="bi bi-people"></i>
-        <h4>Team Collaboration</h4>
-        <p>Collaborate in real-time and keep your team aligned on every project.</p>
-    </div>
-    <div class="feature-card">
-        <i class="bi bi-bar-chart-line"></i>
-        <h4>Analytics</h4>
-        <p>Monitor project progress and performance with detailed reports.</p>
-    </div>
-    <div class="feature-card">
-        <i class="bi bi-shield-lock"></i>
-        <h4>Secure Data</h4>
-        <p>Your workspace and data are fully secure and private.</p>
+<section class="features-section" id="features">
+    <div style="max-width:1160px;margin:0 auto;">
+        <div class="text-center reveal">
+            <span class="section-eyebrow">Features</span>
+            <h2 class="section-title">Everything your team needs</h2>
+            <p class="section-sub">A focused set of tools designed to remove friction and help your team ship.</p>
+        </div>
+
+        <div class="feature-grid">
+
+            <div class="feature-card reveal" style="transition-delay:0.05s;">
+                <div class="feature-icon-wrap" style="background:rgba(79,124,255,0.12);color:var(--accent);">
+                    <i class="bi bi-kanban"></i>
+                </div>
+                <h4>Kanban Boards</h4>
+                <p>Visualise your workflow with drag-and-drop boards. Move tasks through stages and see progress at a glance.</p>
+            </div>
+
+            <div class="feature-card reveal" style="transition-delay:0.10s;">
+                <div class="feature-icon-wrap" style="background:rgba(124,92,252,0.12);color:var(--accent2);">
+                    <i class="bi bi-people"></i>
+                </div>
+                <h4>Team Collaboration</h4>
+                <p>Assign tasks, leave comments, and mention teammates. Everyone stays on the same page, always.</p>
+            </div>
+
+            <div class="feature-card reveal" style="transition-delay:0.15s;">
+                <div class="feature-icon-wrap" style="background:rgba(48,216,125,0.12);color:var(--low);">
+                    <i class="bi bi-bar-chart-line"></i>
+                </div>
+                <h4>Analytics & Reports</h4>
+                <p>Track velocity, spot bottlenecks, and share progress with beautiful built-in reports and
+                    dashboards.</p>
+            </div>
+
+            <div class="feature-card reveal" style="transition-delay:0.20s;">
+                <div class="feature-icon-wrap" style="background:rgba(255,84,112,0.12);color:var(--high);">
+                    <i class="bi bi-shield-lock"></i>
+                </div>
+                <h4>Secure by Default</h4>
+                <p>Role-based access controls, encrypted data at rest, and full audit logs keep your workspace protected.</p>
+            </div>
+
+            <div class="feature-card reveal" style="transition-delay:0.25s;">
+                <div class="feature-icon-wrap" style="background:rgba(255,181,71,0.12);color:#ffb547;">
+                    <i class="bi bi-bell"></i>
+                </div>
+                <h4>Smart Notifications</h4>
+                <p>Get notified when it matters. Deadline reminders, mentions, and status changes — delivered where you work.</p>
+            </div>
+
+            <div class="feature-card reveal" style="transition-delay:0.30s;">
+                <div class="feature-icon-wrap" style="background:rgba(79,124,255,0.12);color:var(--accent);">
+                    <i class="bi bi-calendar3"></i>
+                </div>
+                <h4>Timeline View</h4>
+                <p>See every project on a shared calendar. Spot scheduling conflicts before they become problems.
+                </p>
+            </div>
+
+        </div>
     </div>
 </section>
 
-<section class="how-it-works" id="how-it-works">
-    <h2>How Taskly Works</h2>
-    <div class="steps">
-        <div class="step">
-            <i class="bi bi-person-plus"></i>
-            <h5>Sign Up</h5>
-            <p>Create your account and workspace quickly.</p>
+<section class="how-section" id="how-it-works">
+    <div style="max-width:1160px;margin:0 auto;">
+        <div class="text-center reveal">
+            <span class="section-eyebrow">How it Works</span>
+            <h2 class="section-title">Up and running in minutes</h2>
+            <p class="section-sub">No onboarding calls, no complicated setup. Just you and your team, ready to go.
+            </p>
         </div>
-        <div class="step">
-            <i class="bi bi-kanban"></i>
-            <h5>Create Projects</h5>
-            <p>Organize your projects into boards and tasks.</p>
-        </div>
-        <div class="step">
-            <i class="bi bi-people"></i>
-            <h5>Collaborate</h5>
-            <p>Invite your team and assign tasks seamlessly.</p>
-        </div>
-        <div class="step">
-            <i class="bi bi-bar-chart-line"></i>
-            <h5>Track Progress</h5>
-            <p>Monitor progress and optimize workflow efficiently.</p>
+
+        <div class="steps-grid">
+            <div class="step-item reveal" style="transition-delay:0.05s;">
+                <div class="step-num-wrap">
+                    <i class="bi bi-person-plus" style="font-size:22px;color:var(--accent);"></i>
+                    <span class="step-num">1</span>
+                </div>
+                <h5>Sign Up</h5>
+                <p>Create your account in seconds.</p>
+            </div>
+            <div class="step-item reveal" style="transition-delay:0.12s;">
+                <div class="step-num-wrap">
+                    <i class="bi bi-folder2-open" style="font-size:22px;color:var(--accent2);"></i>
+                    <span class="step-num">2</span>
+                </div>
+                <h5>Create Projects</h5>
+                <p>Organise your work into projects with boards, lists, and milestones.</p>
+            </div>
+            <div class="step-item reveal" style="transition-delay:0.20s;">
+                <div class="step-num-wrap">
+                    <i class="bi bi-people" style="font-size:22px;color:var(--low);"></i>
+                    <span class="step-num">3</span>
+                </div>
+                <h5>Invite Your Team</h5>
+                <p>Bring everyone in with one link. Assign roles and permissions instantly.</p>
+            </div>
+            <div class="step-item reveal" style="transition-delay:0.28s;">
+                <div class="step-num-wrap">
+                    <i class="bi bi-graph-up-arrow" style="font-size:22px;color:#ffb547;"></i>
+                    <span class="step-num">4</span>
+                </div>
+                <h5>Track & Ship</h5>
+                <p>Monitor progress in real-time and celebrate every delivery together.</p>
+            </div>
         </div>
     </div>
-</section>
-
-<section class="cta" id="cta">
-    <h2>Start Managing Your Projects Today</h2>
-    <p>Join Taskly and streamline your team's workflow.</p>
-    <a href="{% url 'register' %}" class="btn btn-primary btn-lg">Create Your Workspace</a>
 </section>
 {% endblock %}
+
+</html>
