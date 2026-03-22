@@ -350,14 +350,20 @@ body.page-home::before {
   position: fixed;
   top: 0; left: 0; right: 0;
   z-index: 1000;
-  padding: 0 20%;
   height: 68px;
   display: flex;
-  align-items: center;
+  justify-content: center;
   background: rgba(13,15,20,0.85);
   backdrop-filter: blur(16px);
   border-bottom: 1px solid rgba(38,44,61,0.6);
-  transition: background 0.3s;
+}
+
+.nav-container {
+  width: 100%;
+  max-width: 1200px;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
 }
 
 .nav-logo {
@@ -407,11 +413,12 @@ body.page-home::before {
 .nav-links {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-top: 15px;
+  gap: 6px;
   margin-left: auto;
+  margin-top: 20px;
   list-style: none;
 }
+
 .nav-links a {
   padding: 7px 14px;
   border-radius: 9px;
@@ -660,14 +667,23 @@ body.page-home::before {
 section { position: relative; z-index: 1; }
 
 .section-eyebrow {
-  display: inline-block;
-  font-size: 11px; font-weight: 700;
-  letter-spacing: 1.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.6px;
   text-transform: uppercase;
   color: var(--accent);
-  margin-bottom: 12px;
   font-family: var(--font);
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(79,124,255,0.10);
+  border: 1px solid rgba(79,124,255,0.25);
+  box-shadow: 0 0 20px rgba(79,124,255,0.08);
+  margin-bottom: 14px;
 }
+
 .section-title {
   font-size: clamp(1.8rem, 3.5vw, 2.5rem);
   font-weight: 800;
@@ -1226,9 +1242,10 @@ section { position: relative; z-index: 1; }
     backdrop-filter: blur(20px);
     border-left: 1px solid var(--border);
 
-    display: flex;
     flex-direction: column;
-    gap: 10px;
+    align-items: flex-start;
+    gap: 12px;
+
     padding: 80px 20px 20px;
 
     transform: translateX(100%);
@@ -1250,22 +1267,12 @@ section { position: relative; z-index: 1; }
     width: 100%;
     padding: 12px 14px;
     border-radius: 10px;
-    font-size: 14px;
-    color: var(--text);
-  }
-
-  .nav-links a:hover {
-    background: rgba(255,255,255,0.06);
-  }
-
-  .btn-nav-login,
-  .btn-nav-cta {
-    width: 100%;
-    text-align: center;
+    font-size: 15px;
   }
 
   .nav-toggle {
     display: flex;
+    margin-left: auto;
     z-index: 10001;
   }
 }
@@ -1273,5 +1280,4 @@ section { position: relative; z-index: 1; }
 @media (max-width: 576px) {
   .mini-columns { grid-template-columns: repeat(2,1fr); }
   .float-chip   { display: none; }
-  .cta-inner    { padding: 40px 24px; }
 }

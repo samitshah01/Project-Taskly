@@ -1,15 +1,22 @@
 {% load static %}
 <nav class="site-nav">
-    <a href="#" class="nav-logo">
-        <div class="nav-logo-icon"><img src="{% static 'images/logo/logo.png' %}" alt="Taskly Logo" srcset=""></div>
-        Taskly
-    </a>
-    <ul class="nav-links" id="navLinks">
-        <li><a href="#features">Features</a></li>
-        <li><a href="#how-it-works">How it Works</a></li>
-        <li><a href="#cta">Pricing</a></li>
-        <li><a href="{% url 'login' %}" class="btn-nav-login">Log In</a></li>
-        <li><a href="{% url 'register' %}" class="btn-nav-cta">Sign Up</a></li>
-    </ul>
-    <div class="nav-toggle" id="navToggle"><i class="bi bi-list"></i></div>
+    <div class="nav-container">
+        <a href="#" class="nav-logo">
+            <div class="nav-logo-icon">
+                <img src="{% static 'images/logo/logo.png' %}" alt="Taskly Logo">
+            </div>
+            Taskly
+        </a>
+
+        <ul class="nav-links" id="navLinks">
+            <li><a href="#features">Features</a></li>
+            <li><a href="#how-it-works">How it Works</a></li>
+            <li><a href="{% url 'login' %}" class="btn-nav-login">Log In</a></li>
+            <li><a href="{% url 'register' %}" class="btn-nav-cta">Sign Up</a></li>
+        </ul>
+
+        <div class="nav-toggle" id="navToggle">
+            <i class="bi bi-list"></i>
+        </div>
+    </div>
 </nav>
