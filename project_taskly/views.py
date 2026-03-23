@@ -90,6 +90,11 @@ def register(request):
         if not all([first_name, last_name, username, email, password1, password2]):
             messages.error(request, 'All fields are required.')
             return redirect('register')
+        
+        gmail_regex = r'^[a-zA-Z0-9._%+-]+@gmail\.com$'
+        if not re.match(gmail_regex, email):
+            messages.error(request, 'Please enter a valid Gmail address.')
+            return redirect('register')
 
         valid_username_regex = r'^[A-Za-z0-9][A-Za-z0-9_]{2,49}$'
         if not re.match(valid_username_regex, username):
