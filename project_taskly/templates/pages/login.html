@@ -1,84 +1,66 @@
 {% extends 'components/base.html' %}
 
-{% block title %}Login - taskly{% endblock %}
+{% block title %}Login - Taskly{% endblock %}
 
 {% block content %}
-{% include 'components/navbar.html' with is_homepage=False %}
-<div class="login-wrapper">
-    <div class="container">
-        <div class="card login-card shadow-lg">
-            <div class="login-brand">
-                <h1><i class="bi bi-bullseye me-2"></i>Taskly</h1>
-                <p class="text-muted">Sign in to your account</p>
-            </div>
 
-            {% if messages %}
-            {% for message in messages %}
-            {% if message.tags == 'error' %}
-            <div class="alert alert-danger" role="alert">
-                {% else %}
-                <div class="alert alert-{{ message.tags }}" role="alert">
-                    {% endif %}
-                    {% if 'success' in message.tags %}
-                    <i class="bi bi-check-circle-fill me-2"></i>
-                    {% elif 'warning' in message.tags %}
-                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                    {% elif 'error' in message.tags %}
-                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                    {% endif %}
-                    {{ message }}
-                </div>
-                {% endfor %}
-                {% endif %}
+<div class="login-page">
+  <div class="login-card">
 
-                <!-- Login form -->
-                <form id="loginForm" method="post" action="{% url 'login' %}">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <label for="email" class="form-label">Email</label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-secondary border-secondary text-light">
-                                <i class="bi bi-envelope"></i>
-                            </span>
-                            <input type="email" class="form-control" id="email" name="email"
-                                placeholder="johndoe@gmail.com" required
-                                value="{{ request.POST.email|default_if_none:'' }}">
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between">
-                            <label for="password" class="form-label">Password</label>
-                            <a href="{% url 'forgot_password' %}"
-                                class="form-text text-decoration-none text-muted">Forgot password?</a>
-                        </div>
-                        <div class="input-group">
-                            <span class="input-group-text bg-secondary border-secondary text-light">
-                                <i class="bi bi-lock"></i>
-                            </span>
-                            <input type="password" class="form-control" id="password" name="password"
-                                placeholder="••••••••" required>
-                            <button class="btn btn-outline-secondary border-secondary text-light" type="button"
-                                id="togglePassword" aria-label="Toggle password visibility">
-                                <i class="bi bi-eye"></i>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="mb-3 form-check">
-                        <input type="checkbox" class="form-check-input" id="rememberMe" name="remember">
-                        <label class="form-check-label text-muted" for="rememberMe">Remember me</label>
-                    </div>
-
-                    <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-primary">Sign In</button>
-                    </div>
-                </form>
-
-                <p class="text-center mt-4 mb-0 text-muted">Don't have an account? <a href="{% url 'register' %}"
-                        class="text-decoration-none text-light">Create an account</a></p>
-            </div>
-        </div>
+    <div class="login-header">
+      <h1 class="login-title">Welcome back</h1>
+      <p class="login-sub">Sign in to your Taskly workspace.</p>
     </div>
+
+    <form method="POST" action="{% url 'login' %}" novalidate>
+      {% csrf_token %}
+
+      <div class="login-field">
+        <label class="login-label" for="identifier">Email or Username</label>
+        <div class="login-input-wrap" id="identifierWrap">
+          <i class="bi bi-person login-input-icon"></i>
+          <input type="text" id="identifier" name="identifier" class="login-input" placeholder="john@company.com or johndoe" autocomplete="username" required />
+        </div>
+      </div>
+
+      <div class="login-field">
+        <div class="login-label-row">
+          <label class="login-label" for="password" style="margin-bottom:0;">Password</label>
+          <a href="{% url 'forgot_password' %}" class="login-forgot">Forgot password?</a>
+        </div>
+        <div class="login-input-wrap" id="pwWrap">
+          <i class="bi bi-lock login-input-icon"></i>
+          <input type="password" id="password" name="password" class="login-input" placeholder="••••••••" autocomplete="current-password" required/>
+          <button type="button" class="login-pw-toggle" id="pwToggle" tabindex="-1">
+            <i class="bi bi-eye" id="pwToggleIcon"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="login-remember">
+        <label class="login-check-label">
+          <input type="checkbox" name="remember" class="login-check" id="rememberMe"/>
+          <span class="login-check-box"></span>
+          Keep me signed in for 30 days
+        </label>
+      </div>
+
+      <button type="submit" class="login-submit">
+        Sign In <i class="bi bi-arrow-right"></i>
+      </button>
+    </form>
+
+    <p class="login-switch">
+      Don't have an account yet? <a href="{% url 'register' %}">Sign up now</a>
+    </p>
+
+  </div>
+
+  <p class="login-legal">
+    By signing in you agree to our
+    <a href="#" data-bs-toggle="modal" data-bs-target="#legalModal" onclick="setLegalTab('tos')">Terms of Service</a>
+    and
+    <a href="#" data-bs-toggle="modal" data-bs-target="#legalModal" onclick="setLegalTab('privacy')">Privacy Policy</a>.
+  </p>
 </div>
 {% endblock %}

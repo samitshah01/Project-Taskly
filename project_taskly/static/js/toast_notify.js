@@ -55,7 +55,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }, speed);
     }
 
-    function show(type, message) {
+    window.showToast = function(type, message) {
         if (!container) return;
 
         const toast = createToast(type, message);
@@ -95,8 +95,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 t.includes('warning') ? 'warning' :
                 'info';
 
-            show(type, m.text || '');
+            showToast(type, m.text || '');
         }, i * 120);
     });
-
 });

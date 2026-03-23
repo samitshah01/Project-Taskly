@@ -1,159 +1,103 @@
 {% extends 'components/base.html' %}
 
-{% block title %}Register - taskly{% endblock %}
+{% block title %}Register - Taskly{% endblock %}
 
 {% block content %}
-{% include 'components/navbar.html' with is_homepage=False %}
-    <div class="register-wrapper">
-        <div class="container">
-            <div class="card register-card shadow-lg">
-                <div class="register-brand">
-                    <h1><i class="bi bi-bullseye me-2"></i>Taskly</h1>
-                    <p class="text-muted">Create your account</p>
+<div class="reg-page">
+    <div class="reg-card">
+        <div class="reg-header">
+            <h1 class="reg-title">Create your account</h1>
+            <p class="reg-sub">Start managing projects with your team.</p>
+        </div>
+
+        <form method="POST" action="{% url 'register' %}" novalidate>
+            {% csrf_token %}
+
+            <div class="reg-row">
+                <div class="reg-field">
+                    <label class="reg-label" for="first_name">First name</label>
+                    <div class="reg-input-wrap" data-wrap>
+                        <i class="bi bi-person reg-input-icon"></i>
+                        <input type="text" id="first_name" name="first_name" class="reg-input" placeholder="John" autocomplete="given-name" required />
+                    </div>
                 </div>
-
-                {% if messages %}
-                    {% for message in messages %}
-                        {% if message.tags == 'error' %}
-                            <div class="alert alert-danger" role="alert">
-                        {% else %}
-                            <div class="alert alert-{{ message.tags }}" role="alert">
-                        {% endif %}
-                                {% if 'success' in message.tags %}
-                                    <i class="bi bi-check-circle-fill me-2"></i>
-                                {% elif 'warning' in message.tags %}
-                                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                                {% elif 'error' in message.tags %}
-                                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                                {% endif %}
-                                {{ message }}
-                            </div>
-                    {% endfor %}
-                {% endif %}
-
-                <form id="registerForm" method="POST" action="{% url 'register' %}">
-                    {% csrf_token %}
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="firstName" class="form-label">First Name</label>
-                            <input type="text" class="form-control" id="firstName" name="first_name" placeholder="John" required>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="lastName" class="form-label">Last Name</label>
-                            <input type="text" class="form-control" id="lastName" name="last_name" placeholder="Doe" required>
-                        </div>
+                <div class="reg-field">
+                    <label class="reg-label" for="last_name">Last name</label>
+                    <div class="reg-input-wrap" data-wrap>
+                        <i class="bi bi-person reg-input-icon"></i>
+                        <input type="text" id="last_name" name="last_name" class="reg-input" placeholder="Doe" autocomplete="family-name" required />
                     </div>
-
-                    <div class="mb-3">
-                        <label for="email" class="form-label">Email</label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-secondary border-secondary text-light">
-                                <i class="bi bi-envelope"></i>
-                            </span>
-                            <input type="email" class="form-control" id="email" name="email" placeholder="john@example.com" required>
-                        </div>
-                    </div>
-
-                    <div class="mb-3 position-relative">
-                        <label for="password" class="form-label d-flex align-items-center position-relative">
-                            <span>Password</span>
-                            <i class="bi bi-info-circle ms-2 text-white-50" data-bs-toggle="tooltip" data-bs-placement="right" title="Password must be at least 8 characters long and include an uppercase, lowercase, number, and special character."></i>
-                        </label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-secondary border-secondary text-light">
-                                <i class="bi bi-lock"></i>
-                            </span>
-                            <input type="password" class="form-control" id="password" name="password"
-                                placeholder="••••••••" required>
-                            <button class="btn btn-outline-secondary border-secondary text-light" type="button" id="togglePassword">
-                                <i class="bi bi-eye"></i>
-                            </button>
-                        </div>
-                        <small id="passwordStrength" class="form-text text-muted mt-1 d-block"></small>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="confirmPassword" class="form-label">Confirm Password</label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-secondary border-secondary text-light">
-                                <i class="bi bi-lock"></i>
-                            </span>
-                            <input type="password" class="form-control" id="confirmPassword" name="confirm_password"
-                                placeholder="••••••••" required>
-                        </div>
-                        <div id="passwordMatch" class="form-text text-danger d-none">
-                            Passwords do not match
-                        </div>
-                    </div>
-
-                    <div class="mb-4 form-check">
-                        <input type="checkbox" class="form-check-input" id="termsCheck" required>
-                        <label class="form-check-label" for="termsCheck">
-                            I agree to the
-                            <a href="#" class="text-decoration-none contd-color" data-bs-toggle="modal" data-bs-target="#termsModal">Terms</a>
-                            and
-                            <a href="#" class="text-decoration-none contd-color" data-bs-toggle="modal" data-bs-target="#privacyModal">Privacy Policy</a>.
-                        </label>
-                    </div>
-
-                    <div class="d-grid gap-2 mb-3">
-                        <button type="submit" class="btn btn-primary" id="registerButton" disabled>Create
-                            Account</button>
-                    </div>
-                </form>
-
-                <p class="text-center mt-4 mb-0 text-muted">
-                    Already have an account? <a href="{% url 'login' %}" class="text-decoration-none text-light">Sign in</a>
-                </p>
+                </div>
             </div>
-        </div>
+
+            <div class="reg-field">
+                <label class="reg-label" for="username">Username</label>
+                <div class="reg-input-wrap" data-wrap>
+                    <i class="bi bi-at reg-input-icon"></i>
+                    <input type="text" id="username" name="username" class="reg-input" placeholder="johndoe" autocomplete="username" required />
+                </div>
+                <div id="usernameFeedback" class="username-feedback">
+                    <i></i>
+                    <span></span>
+                </div>
+            </div>
+
+            <div class="reg-field">
+                <label class="reg-label" for="email">Email address</label>
+                <div class="reg-input-wrap" data-wrap>
+                    <i class="bi bi-envelope reg-input-icon"></i>
+                    <input type="email" id="email" name="email" class="reg-input" placeholder="john@company.com" autocomplete="email" required />
+                </div>
+            </div>
+
+            <div class="reg-field">
+                <label class="reg-label" for="password1">Password</label>
+                <div class="reg-input-wrap" data-wrap>
+                    <i class="bi bi-lock reg-input-icon"></i>
+                    <input type="password" id="password1" name="password1" class="reg-input has-toggle" placeholder="Create a strong password" autocomplete="new-password" required oninput="checkStrength(this.value)" />
+                    <button type="button" class="reg-pw-toggle" data-target="password1" tabindex="-1">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                </div>
+                <div class="reg-strength" id="strengthMeter" style="display:none;">
+                    <div class="reg-strength-bars">
+                        <div class="reg-strength-bar" id="sb1"></div>
+                        <div class="reg-strength-bar" id="sb2"></div>
+                        <div class="reg-strength-bar" id="sb3"></div>
+                        <div class="reg-strength-bar" id="sb4"></div>
+                    </div>
+                    <span class="reg-strength-label" id="strengthLabel"></span>
+                </div>
+            </div>
+
+            <div class="reg-field">
+                <label class="reg-label" for="password2">Confirm password</label>
+                <div class="reg-input-wrap" data-wrap>
+                    <i class="bi bi-lock-fill reg-input-icon"></i>
+                    <input type="password" id="password2" name="password2" class="reg-input has-toggle"
+                        placeholder="Repeat your password" autocomplete="new-password" required />
+                    <button type="button" class="reg-pw-toggle" data-target="password2" tabindex="-1">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="reg-terms">
+                <label class="reg-check-label">
+                    <input type="checkbox" name="terms" class="reg-check" id="terms" required />
+                    <span class="reg-check-box"></span>
+                    I agree to Taskly's<a href="#" data-bs-toggle="modal" data-bs-target="#legalModal" onclick="setLegalTab('tos')">Terms of Service</a>and<a href="#" data-bs-toggle="modal" data-bs-target="#legalModal" onclick="setLegalTab('privacy')">Privacy Policy</a>
+                </label>
+            </div>
+
+            <button type="submit" class="reg-submit">
+                Create Account <i class="bi bi-arrow-right"></i>
+            </button>
+        </form>
+
+        <p class="reg-switch">
+            Already have an account? <a href="{% url 'login' %}">Sign in</a>
+        </p>
     </div>
-
-    <!-- Terms of Service Modal -->
-    <div class="modal fade" id="termsModal" tabindex="-1" aria-labelledby="termsModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
-            <div class="modal-content bg-dark text-light border-secondary shadow-lg">
-            <div class="modal-header border-secondary">
-                <h5 class="modal-title" id="termsModalLabel"><i class="bi bi-file-earmark-text me-2"></i>Terms of Service</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p>Welcome to <strong>Taskly</strong>, your project management tool. By creating an account, you agree to:</p>
-                <ul>
-                <li>Use the platform responsibly and not share confidential workspace data.</li>
-                <li>Allow Taskly to send essential notifications about project activity and updates.</li>
-                <li>Respect collaboration features and workspace permissions set by organization admins.</li>
-                </ul>
-                <p class="text-muted small mt-3">For full details, refer to our complete Terms of Service on the Taskly website.</p>
-            </div>
-            <div class="modal-footer border-secondary">
-                <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Close</button>
-            </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Privacy Policy Modal -->
-    <div class="modal fade" id="privacyModal" tabindex="-1" aria-labelledby="privacyModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
-            <div class="modal-content bg-dark text-light border-secondary shadow-lg">
-            <div class="modal-header border-secondary">
-                <h5 class="modal-title" id="privacyModalLabel"><i class="bi bi-shield-lock me-2"></i>Privacy Policy</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p>At <strong>Taskly</strong>, your privacy is important to us. We:</p>
-                <ul>
-                <li>Store only essential account and workspace information.</li>
-                <li>Encrypt passwords and secure all communication with SSL.</li>
-                <li>Never sell or share your data with third parties.</li>
-                </ul>
-                <p class="text-muted small mt-3">Learn more about how we protect your data in our full Privacy Policy.</p>
-            </div>
-            <div class="modal-footer border-secondary">
-                <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Close</button>
-            </div>
-            </div>
-        </div>
-    </div>
+</div>
 {% endblock %}

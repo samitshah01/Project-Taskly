@@ -1,0 +1,94 @@
+{% extends 'components/base.html' %}
+{% load static %}
+
+{% block title %}Verify Email - Taskly{% endblock %}
+
+{% block content %}
+<div class="otp-page">
+  <div class="otp-card">
+    <div id="otp-form-view">
+      <div class="otp-envelope-wrap">
+        <div class="otp-envelope">
+          <div class="otp-envelope-ring-2"></div>
+          <div class="otp-envelope-ring"></div>
+          <div class="otp-envelope-bg">
+            <i class="bi bi-envelope-paper-fill"></i>
+          </div>
+        </div>
+      </div>
+      <div class="otp-header">
+        <h1 class="otp-title">Enter verification code</h1>
+        <p class="otp-sub">We sent a 6-digit code to your email address.</p>
+        <div class="otp-email-pill">
+          <i class="bi bi-envelope" style="font-size:11px;"></i>
+          {{ masked_email }}
+        </div>
+      </div>
+
+      <form id="otp-form" method="POST" action="{% url 'verify_otp' %}" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="otp" id="otp-hidden" />
+
+        <div class="otp-inputs" id="otp-inputs">
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-digit" data-idx="0"
+            autocomplete="one-time-code" />
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-digit" data-idx="1" />
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-digit" data-idx="2" />
+          <div class="otp-sep"><span></span></div>
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-digit" data-idx="3" />
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-digit" data-idx="4" />
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-digit" data-idx="5" />
+        </div>
+
+        <div class="otp-timer-row">
+          Code expires in
+          <div class="otp-timer-badge" id="otp-timer-badge">
+            <i class="bi bi-clock" style="font-size:11px;"></i>
+            <span id="otp-timer-val">10:00</span>
+          </div>
+        </div>
+
+        <button type="submit" class="otp-submit" id="otp-submit-btn" disabled>
+          <div class="otp-spinner"></div>
+          <span class="otp-btn-label">Verify Code</span>
+          <i class="bi bi-shield-check otp-btn-icon"></i>
+        </button>
+
+      </form>
+
+      <div class="otp-resend-row">
+        Didn't receive the code?&nbsp;
+        <button class="otp-resend-btn" id="otp-resend-btn" disabled type="button">
+          Resend in <span id="otp-resend-timer">60s</span>
+        </button>
+      </div>
+
+      <div class="otp-divider"><span>or</span></div>
+      <a href="{% url 'login' %}" class="otp-back">
+        <i class="bi bi-arrow-left" style="font-size:13px;"></i>
+        Back to Sign In
+      </a>
+
+    </div>
+
+    <div class="otp-success-state" id="otp-success-view">
+      <div class="otp-success-icon">
+        <i class="bi bi-patch-check-fill"></i>
+      </div>
+      <div class="otp-success-title">Email verified!</div>
+      <p class="otp-success-msg">
+        Your identity has been confirmed.<br />
+        You're all set to continue.
+      </p>
+      <a href="{% url 'dashboard' %}" class="otp-continue-btn">
+        Go to Dashboard <i class="bi bi-arrow-right"></i>
+      </a>
+    </div>
+
+  </div>
+
+</div>
+
+<script src="{% static 'js/verify_otp.js' %}"></script>
+
+{% endblock %}
