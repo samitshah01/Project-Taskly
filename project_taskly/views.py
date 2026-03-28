@@ -1,4 +1,5 @@
 import re
+import json
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.utils import timezone
@@ -9,6 +10,21 @@ from .models import Users, Project, Task, Expense, ActivityLog
 from django.http import JsonResponse
 from .utils import create_and_send_otp, verify_otp, mask_email
 from django.contrib.auth.hashers import make_password
+from django.views.decorators.http import require_POST
+
+@require_POST
+def set_timezone(request):
+    try:
+        data = json.loads(request.body)
+        tz_name = data.get("timezone", "").strip()
+
+        if tz_name:
+            request.session["user_timezone"] = tz_name
+            return JsonResponse({"status": "ok", "timezone": tz_name})
+
+        return JsonResponse({"status": "error", "message": "Timezone missing"}, status=400)
+    except Exception:
+        return JsonResponse({"status": "error", "message": "Invalid request"}, status=400)
 
 def index(request):
     return render(request, 'index.html')
@@ -32,8 +48,7 @@ def login(request):
         password = request.POST.get('password', '').strip()
         remember = request.POST.get('remember', False)
 
-        user = Users.objects.filter(email__iexact=identifier).first() \
-            or Users.objects.filter(username__iexact=identifier).first()
+        user = Users.objects.filter(email__iexact=identifier).first() or Users.objects.filter(username__iexact=identifier).first()
 
         if not user:
             messages.error(request, 'User not found.')
@@ -47,7 +62,8 @@ def login(request):
             request.session['user_id'] = user.id
             request.session['user_email'] = user.email
             request.session['user_role'] = user.role
-            request.session['user_name'] = f"{user.first_name} {user.last_name}".strip()
+            request.session['user_full_name'] = f"{user.first_name or ''} {user.last_name or ''}".strip()
+            request.session['user_username'] = user.username
 
             request.session.set_expiry(0 if not remember else 60 * 60 * 24 * 30)
 
@@ -250,7 +266,6 @@ def dashboard(request):
         return redirect('login')
 
     user_id = request.session.get('user_id')
-
     user = Users.objects.filter(id=user_id).first()
 
     if not user:
@@ -258,38 +273,33 @@ def dashboard(request):
         request.session.flush()
         return redirect('login')
 
-    total_projects = Project.objects.count()
-    team_list = Users.objects.all()
+    now = timezone.localtime()
+    hour = now.hour
 
-    active_tasks = Task.objects.filter(
-        status__in=["todo", "in_progress", "review"]
-    ).count()
-
-    total_team_members = Users.objects.count()
-
-    budget_used = Expense.objects.aggregate(
-        total=Sum('amount')
-    )['total'] or 0
-
-    recent_tasks = Task.objects.order_by('-id')[:5]
-
-    recent_projects = Project.objects.order_by('-id')[:5]
-
-    recent_activities = ActivityLog.objects.order_by('-timestamp')[:5]
+    if hour < 5:
+        greeting = "Still up"
+        greeting_icon = "moon-stars"
+    elif hour < 12:
+        greeting = "Good morning"
+        greeting_icon = "sunrise"
+    elif hour < 17:
+        greeting = "Good afternoon"
+        greeting_icon = "sun"
+    elif hour < 21:
+        greeting = "Good evening"
+        greeting_icon = "sunset"
+    else:
+        greeting = "Working late"
+        greeting_icon = "moon"
 
     context = {
         "user": user,
-        "total_projects": total_projects,
-        "active_tasks": active_tasks,
-        "team_members": total_team_members,
-        "budget_used": budget_used,
-        "recent_tasks": recent_tasks,
-        "recent_projects": recent_projects,
-        "recent_activities": recent_activities,
-        "team_list": team_list
+        "greeting": greeting,
+        "greeting_icon": greeting_icon,
+        "today": now.strftime("%A, %B %d, %Y"),
     }
 
-    return render(request, 'pages/dashboard.html', context)
+    return render(request, 'dashboard/dashboard.html', context)
 
 def log_activity(user_id, action, project=None, task=None):
     user = Users.objects.filter(id=user_id).first()
@@ -318,7 +328,7 @@ def projects(request):
         "active_page": "projects"
     }
 
-    return render(request, "pages/projects.html", context)
+    return render(request, "dashboard/projects.html", context)
 
 def create_project(request):
 
