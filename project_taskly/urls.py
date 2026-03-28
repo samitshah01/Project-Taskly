@@ -3,6 +3,7 @@ from . import views
 
 urlpatterns = [
     path('', views.index, name='index'),
+    path('set-timezone/', views.set_timezone, name='set_timezone'),
     path('login/', views.login, name='login'),
     path('check-username/', views.check_username, name='check_username'),
     
