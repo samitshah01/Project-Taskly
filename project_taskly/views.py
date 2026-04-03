@@ -5,12 +5,14 @@ from django.contrib import messages
 from django.utils import timezone
 from django.contrib.auth.hashers import check_password
 from django.views.decorators.csrf import csrf_protect
-from django.db.models import Sum
-from .models import Users, Project, Task, Expense, ActivityLog
+from .models import Users
 from django.http import JsonResponse
 from .utils import create_and_send_otp, verify_otp, mask_email
 from django.contrib.auth.hashers import make_password
 from django.views.decorators.http import require_POST
+import logging
+
+logger = logging.getLogger(__name__)
 
 @require_POST
 def set_timezone(request):
@@ -50,7 +52,10 @@ def login(request):
 
         user = Users.objects.filter(email__iexact=identifier).first() or Users.objects.filter(username__iexact=identifier).first()
 
+        logger.info(f"Login attempt for identifier={identifier}")
+
         if not user:
+            logger.warning(f"Login failed - user not found: {identifier}")
             messages.error(request, 'User not found.')
             return render(request, 'pages/login.html')
 
@@ -58,6 +63,8 @@ def login(request):
 
         if check_password(password, user_password):
             request.session.flush()
+
+            logger.info(f"User logged in successfully: user_id={user.id}")
 
             request.session['user_id'] = user.id
             request.session['user_email'] = user.email
@@ -67,8 +74,10 @@ def login(request):
 
             request.session.set_expiry(0 if not remember else 60 * 60 * 24 * 30)
 
+            messages.success(request, 'Successfully Logged In.')
             return redirect('dashboard')
         else:
+            logger.warning(f"Invalid password attempt for user: {identifier}")
             messages.error(request, 'Invalid password.')
 
     return render(request, 'pages/login.html')
@@ -145,6 +154,7 @@ def register(request):
             return redirect('login')
 
         except Exception as e:
+            logger.error(f"Error creating user {email}: {str(e)}")
             messages.error(request, f'Error creating account: {str(e)}')
             return redirect('register')
 
@@ -175,6 +185,7 @@ def forgot_password(request):
             return redirect('verify_otp')
 
         except Exception as e:
+            logger.error(f"OTP sending failed for {email}: {str(e)}")
             messages.error(request, f"Failed to send OTP: {str(e)}")
             return redirect('forgot_password')
 
@@ -301,143 +312,5 @@ def dashboard(request):
 
     return render(request, 'dashboard/dashboard.html', context)
 
-def log_activity(user_id, action, project=None, task=None):
-    user = Users.objects.filter(id=user_id).first()
-
-    if user:
-        ActivityLog.objects.create(
-            user=user,
-            action=action,
-            project=project,
-            task=task,
-            timestamp=timezone.now()
-        )
-
-def projects(request):
-
-    projects = Project.objects.select_related("manager").all()
-    managers = Users.objects.all()
-
-    context = {
-        "projects": projects,
-        "managers": managers,
-        "total_projects": projects.count(),
-        "in_progress": projects.filter(status="in_progress").count(),
-        "completed": projects.filter(status="completed").count(),
-        "on_hold": projects.filter(status="on_hold").count(),
-        "active_page": "projects"
-    }
-
-    return render(request, "dashboard/projects.html", context)
-
-def create_project(request):
-
-    if request.method == "POST":
-
-        name = request.POST.get("name")
-        description = request.POST.get("description")
-        start_date = request.POST.get("start_date")
-        end_date = request.POST.get("end_date")
-        budget = request.POST.get("budget")
-        manager_id = request.POST.get("manager")
-        status = request.POST.get("status")
-
-        manager = Users.objects.filter(id=manager_id).first()
-
-        project = Project.objects.create(
-            name=name,
-            description=description,
-            start_date=start_date,
-            end_date=end_date if end_date else None,
-            budget=budget,
-            manager=manager,
-            status=status,
-            created_at=timezone.now(),
-            updated_at=timezone.now()
-        )
-
-        # Activity Log
-        log_activity(
-            request.session.get("user_id"),
-            f"Created project '{project.name}'",
-            project
-        )
-
-    return redirect("projects")
-
-def view_project(request, id):
-
-    project = get_object_or_404(Project, id=id)
-
-    context = {
-        "project": project,
-        "active_page": "projects"
-    }
-
-    return render(request, "pages/view_project.html", context)
-
-def edit_project(request, id):
-
-    project = get_object_or_404(Project, id=id)
-    managers = Users.objects.all()
-
-    if request.method == "POST":
-
-        project.name = request.POST.get("name")
-        project.description = request.POST.get("description")
-        project.start_date = request.POST.get("start_date")
-        project.end_date = request.POST.get("end_date")
-        project.budget = request.POST.get("budget")
-        project.status = request.POST.get("status")
-
-        manager_id = request.POST.get("manager")
-        project.manager = Users.objects.filter(id=manager_id).first()
-
-        project.updated_at = timezone.now()
-
-        project.save()
-
-        log_activity(
-            request.session.get("user_id"),
-            f"Updated project '{project.name}'",
-            project
-        )
-
-        messages.success(request, "Project updated successfully.")
-        return redirect("projects")
-
-    context = {
-        "project": project,
-        "managers": managers,
-        "active_page": "projects"
-    }
-
-    return render(request, "pages/edit_project.html", context)
-
-def delete_project(request, id):
-
-    project = get_object_or_404(Project, id=id)
-    project_name = project.name
-
-    log_activity(
-        request.session.get("user_id"),
-        f"Deleted project '{project_name}'",
-        project
-    )
-    project.delete()
-
-    messages.success(request, "Project deleted successfully.")
-
-    return redirect("projects")
-
-def settings(request):
-
-    user_id = request.session.get("user_id")
-    user = Users.objects.filter(id=user_id).first()
-
-    context = {
-        "user": user,
-        "active_page": "settings"
-    }
-
-    return render(request, "pages/settings.html", context)
+def profile(request):
+    return render(request, 'dashboard/profile.html')

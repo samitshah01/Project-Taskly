@@ -162,23 +162,30 @@ DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL')
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+
     'filters': {
         'ignore_devtools': {
             '()': 'django.utils.log.CallbackFilter',
             'callback': lambda record: '/.well-known/appspecific/' not in record.getMessage(),
         },
     },
+
+    'formatters': {
+        'color': {
+            '()': 'project_taskly.logging.ColorFormatter',
+        },
+    },
+
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
             'filters': ['ignore_devtools'],
+            'formatter': 'color',
         },
     },
-    'loggers': {
-        'django.server': {
-            'handlers': ['console'],
-            'level': 'INFO',
-            'propagate': False,
-        },
+
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
     },
 }

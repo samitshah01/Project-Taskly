@@ -81,7 +81,7 @@ class DjangoAdminLog(models.Model):
     action_time = models.DateTimeField()
     object_id = models.TextField(blank=True, null=True)
     object_repr = models.CharField(max_length=200)
-    action_flag = models.PositiveSmallIntegerField()
+    action_flag = models.SmallIntegerField()
     change_message = models.TextField()
     content_type = models.ForeignKey('DjangoContentType', models.DO_NOTHING, blank=True, null=True)
     user = models.ForeignKey(AuthUser, models.DO_NOTHING)
@@ -125,6 +125,7 @@ class DjangoSession(models.Model):
 class Users(models.Model):
     first_name = models.CharField(max_length=100, blank=True, null=True)
     last_name = models.CharField(max_length=100, blank=True, null=True)
+    username = models.CharField(max_length=50, blank=True, null=True)
     email = models.CharField(unique=True, max_length=150, blank=True, null=True)
     password = models.CharField(max_length=255, blank=True, null=True)
     role = models.CharField(max_length=50, blank=True, null=True)
