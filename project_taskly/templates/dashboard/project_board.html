@@ -1,0 +1,203 @@
+{% extends 'components/dashboard_base.html' %}
+
+{% block title %}{{ project.name }} - Taskly{% endblock %}
+
+{% block dashboard_content %}
+<div class="main-area">
+    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
+        <div>
+            <div class="board-breadcrumb">
+                <a href="{% url 'projects' %}">Projects</a>
+                <span>/</span>
+                <span>{{ project.name }}</span>
+            </div>
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <div class="project-icon-wrap" style="background:rgba(79,124,255,0.12);color:{{ project.color }};">
+                    <i class="bi bi-{{ project.icon }}"></i>
+                </div>
+                <div>
+                    <h4 style="font-family:'Poppins',sans-serif;font-weight:800;font-size:1.25rem;margin-bottom:4px;">{{ project.name }}</h4>
+                    <p style="color:var(--muted);font-size:13px;margin:0;">{{ project.description|default:"Track project tasks across the board." }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span class="proj-status {{ project.status }}">{{ project.status_label }}</span>
+            <button class="btn-primary-custom d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#addTaskModal" data-project-id="{{ project.id }}">
+                <i class="bi bi-plus-lg"></i> New Task
+            </button>
+        </div>
+    </div>
+
+    <div class="board-top-meta">
+        <div class="board-top-chip"><i class="bi bi-graph-up-arrow"></i> <span id="boardProgressValue">{{ project_summary.progress }}</span>% complete</div>
+        <div class="board-top-chip"><i class="bi bi-calendar3"></i> {% if project.end_date %}Due {{ project.end_date|date:"M d, Y" }}{% else %}No deadline{% endif %}</div>
+        <div class="board-top-chip"><i class="bi bi-cash-stack"></i> ${{ project.budget }}</div>
+        <div class="board-top-chip"><i class="bi bi-people"></i> <span id="boardTaskTotal">{{ project_summary.total_tasks }}</span> tasks</div>
+    </div>
+
+    <div class="kanban-board kanban-board-match">
+        {% for column in board_columns %}
+        <section class="kanban-column match-column" data-status="{{ column.key }}">
+            <div class="kanban-column-head match-column-head">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="board-status-dot {{ column.key }}"></span>
+                    <h5>{{ column.label }}</h5>
+                </div>
+                <span class="pill-count column-count">{{ column.tasks|length }}</span>
+            </div>
+
+            <div class="kanban-list match-list" data-dropzone="{{ column.key }}">
+                {% for task in column.tasks %}
+                <article
+                    class="kanban-task match-task {% if task.status == 'completed' %}is-completed{% endif %}"
+                    draggable="true"
+                    data-task-id="{{ task.id }}"
+                    data-status="{{ task.status }}"
+                    data-progress-value="{{ task.progress_value }}"
+                    data-comments="{{ task.comment_count }}"
+                    data-detail-url="{% url 'task_detail' task.id %}"
+                    data-update-url="{% url 'update_task_status' task.id %}"
+                    data-full-update-url="{% url 'update_task' task.id %}"
+                    data-comment-url="{% url 'add_task_comment' task.id %}"
+                    data-delete-url="{% url 'delete_task' task.id %}">
+                    <div class="match-task-head">
+                        <div class="match-task-title-wrap">
+                            <div class="match-task-title">{{ task.title }}</div>
+                            <div class="match-task-project"><i class="bi bi-folder"></i> {{ task.project.name }}</div>
+                        </div>
+
+                        <div class="dropdown">
+                            <button type="button" class="match-task-menu" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Task options">
+                                <i class="bi bi-three-dots-vertical"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark-custom board-task-dropdown">
+                                <li><button type="button" class="dropdown-item task-edit-trigger"><i class="bi bi-pencil"></i> Edit</button></li>
+                                <li><button type="button" class="dropdown-item task-move-trigger"><i class="bi bi-arrow-right"></i> Move</button></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><button type="button" class="dropdown-item text-danger task-delete-trigger"><i class="bi bi-trash"></i> Delete</button></li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    {% if task.status == 'in_progress' %}
+                    <div class="match-task-progress">
+                        <div class="progress-header">
+                            <span>Progress</span>
+                            <strong>{{ task.progress_value }}%</strong>
+                        </div>
+                        <div class="progress-track">
+                            <div class="progress-fill" style="width:{{ task.progress_value }}%;background:linear-gradient(90deg,{{ project.color }},var(--accent2));"></div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="match-task-footer">
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <span class="priority-pill {{ task.priority }}">{{ task.priority|upper }}</span>
+                            <div class="match-task-avatars">
+                                {% if task.assigned_to %}
+                                <div class="proj-ava" style="background:var(--accent);">{{ task.assigned_to.initials }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="match-task-meta">
+                            <span><i class="bi bi-calendar3"></i> {% if task.due_date %}{{ task.due_date|date:"M j" }}{% else %}No date{% endif %}</span>
+                            {% if task.status == 'completed' %}
+                            <span class="match-done"><i class="bi bi-check-circle-fill"></i> Done</span>
+                            {% else %}
+                            <span><i class="bi bi-chat"></i> {{ task.comment_count }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+        </section>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="modal fade" id="taskEditModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h4 class="modal-title" id="taskEditTitle" style="margin-bottom:6px;">Task details</h4>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <span class="priority-pill medium" id="taskEditPriorityPill">MEDIUM</span>
+                        <span class="match-task-project" id="taskEditProjectLabel"></span>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="row g-4">
+                    <div class="col-lg-8">
+                        <form id="taskEditForm" class="d-grid" style="gap:18px;">
+                            <div>
+                                <label class="form-label">Title</label>
+                                <input type="text" class="form-control" name="title" id="taskEditTitleInput" required>
+                            </div>
+                            <div>
+                                <label class="form-label">Description</label>
+                                <textarea class="form-control" name="description" id="taskEditDescription" rows="4" style="resize:none;"></textarea>
+                            </div>
+                        </form>
+
+                        <div>
+                            <label class="form-label">Comments</label>
+                            <div id="taskCommentsList" class="task-comments-list"></div>
+                            <form id="taskCommentForm" class="task-comment-compose">
+                                <div class="task-comment-avatar" id="taskCommentAvatar">{{ user_initials }}</div>
+                                <input type="text" class="form-control" id="taskCommentInput" placeholder="Write a comment...">
+                                <button type="submit" class="btn-primary-custom">Send</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-4">
+                        <div class="d-grid" style="gap:18px;">
+                            <div>
+                                <label class="form-label">Status</label>
+                                <select class="form-select" name="status" id="taskEditStatus" form="taskEditForm">
+                                    <option value="todo">To Do</option>
+                                    <option value="in_progress">In Progress</option>
+                                    <option value="completed">Completed</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="form-label">Priority</label>
+                                <select class="form-select" name="priority" id="taskEditPriority" form="taskEditForm">
+                                    <option value="high">High</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="low">Low</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="form-label">Due Date</label>
+                                <input type="date" class="form-control" name="due_date" id="taskEditDueDate" form="taskEditForm">
+                            </div>
+                            <div>
+                                <label class="form-label">Assignee</label>
+                                <select class="form-select" name="assigned_to" id="taskEditAssignee" form="taskEditForm"></select>
+                            </div>
+                            <div>
+                                <label class="form-label">Project</label>
+                                <div class="task-readonly-field" id="taskEditProjectReadonly"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-ghost" data-bs-dismiss="modal">Close</button>
+                <button type="submit" form="taskEditForm" class="btn-primary-custom">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

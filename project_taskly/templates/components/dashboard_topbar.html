@@ -1,0 +1,40 @@
+<header class="topbar">
+    <button class="icon-btn d-lg-none border-0" id="sidebarToggle"><i class="bi bi-list"></i></button>
+    <span class="topbar-title d-none d-md-block">Dashboard</span>
+    <div class="search-wrap">
+        <i class="bi bi-search"></i>
+        <input type="text" class="search-input" placeholder="Search tasks, projects…" />
+    </div>
+    <div class="topbar-actions">
+        <div class="icon-btn"><i class="bi bi-bell"></i>{% if notification_count %}<span class="notif-dot"></span>{% endif %}</div>
+        <button class="btn-primary-custom" data-bs-toggle="modal" data-bs-target="#addTaskModal"
+            style="display:flex;align-items:center;gap:6px;padding:7px 14px;">
+            <i class="bi bi-plus-lg" style="font-size:13px;"></i> New Task
+        </button>
+        <div class="dropdown">
+            <div class="avatar-btn" data-bs-toggle="dropdown" aria-expanded="false">{{ user_initials }}</div>
+            <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark-custom">
+                <li>
+                    <div style="padding:10px 12px 8px;border-bottom:1px solid var(--border);margin-bottom:6px;">
+                        <div style="color:#e8eaf0;font-weight:700;font-size:13px;">
+                            {% if user.first_name or user.last_name %}
+                                {{ user.first_name }} {{ user.last_name }}
+                            {% else %}
+                                {{ user.username }}
+                            {% endif %}
+                        </div>
+                        <div style="font-size:11px;color:var(--muted);">
+                            {{ user.email }}
+                        </div>
+                    </div>
+                </li>
+                <li><a class="dropdown-item" href="#"><i class="bi bi-person"></i> Profile</a></li>
+                <li><a class="dropdown-item" href="#"><i class="bi bi-gear"></i> Settings</a></li>
+                <li>
+                    <hr class="dropdown-divider">
+                </li>
+                <li><a class="dropdown-item" href="{% url 'logout' %}" style="color:var(--high)!important"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
+            </ul>
+        </div>
+    </div>
+</header>

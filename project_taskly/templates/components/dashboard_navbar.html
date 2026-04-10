@@ -1,0 +1,19 @@
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+        <div class="logo-icon"><i class="bi bi-check2-square"></i></div>
+        Taskly
+    </div>
+
+    <div class="sidebar-section">
+        <div class="sidebar-label">Main Menu</div>
+        <a href="{% url 'dashboard' %}" class="nav-item-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"><i class="bi bi-grid-1x2"></i>Dashboard</a>
+
+        <a href="{% url 'projects' %}" class="nav-item-link {% if request.resolver_match.url_name == 'projects' %}active{% endif %}"><i class="bi bi-folder2"></i> Projects <span class="nav-badge">{{ sidebar_project_count }}</span></a>
+        <a href="#" class="nav-item-link"><i class="bi bi-check2-circle"></i> My Tasks <span class="nav-badge">{{ sidebar_task_count }}</span></a>
+        <a href="#" class="nav-item-link"><i class="bi bi-calendar3"></i> Calendar</a>
+        <a href="#" class="nav-item-link"><i class="bi bi-bell"></i> Notifications <span class="nav-badge">{{ notification_count }}</span></a>
+        <a href="#" class="nav-item-link"><i class="bi bi-bar-chart-line"></i> Reports</a>
+    </div>
+</aside>
+
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
