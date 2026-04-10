@@ -1,0 +1,155 @@
+{% extends 'components/dashboard_base.html' %}
+
+{% block title %}Profile - Taskly{% endblock %}
+
+{% block dashboard_content %}
+<div class="profile-container">
+    <div class="profile-card">
+        <div class="avatar-section">
+            <div class="avatar-wrap">
+                <div class="avatar-img" id="avatarDisplay" data-avatar-user-id="{{ user.id }}" data-avatar-initials="{{ user.initials }}">
+                    {% if user.avatar_url %}
+                    <img src="{{ user.avatar_url }}" alt="{{ user.display_name }}" class="avatar-media avatar-media-cover">
+                    {% else %}
+                    {{ user.initials }}
+                    {% endif %}
+                </div>
+                <div class="avatar-online"></div>
+            </div>
+            <input type="file" id="profileAvatarInput" class="d-none" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif">
+            <button type="button" class="avatar-upload-trigger" id="profileAvatarTrigger">
+                <i class="bi bi-camera"></i> Change Photo
+            </button>
+            <div class="profile-name" id="displayName">{{ user.display_name }}</div>
+            <div class="profile-role" id="displayRole"><i class="bi bi-shield-check"></i> {{ profile_role }}</div>
+            <div class="profile-handle" id="displayEmail">{{ user.email }}</div>
+            <div class="profile-bio" id="displayBio">{{ profile_bio }}</div>
+        </div>
+
+        <div class="info-grid">
+            <div class="info-item">
+                <i class="bi bi-building"></i>
+                <div>
+                    <div class="info-label">Team</div>
+                    <div class="info-value" id="displayTeam">{{ profile_team }}</div>
+                </div>
+            </div>
+            <div class="info-item">
+                <i class="bi bi-geo-alt"></i>
+                <div>
+                    <div class="info-label">Location</div>
+                    <div class="info-value" id="displayLocation">{{ profile_location }}</div>
+                </div>
+            </div>
+            <div class="info-item">
+                <i class="bi bi-clock"></i>
+                    <div>
+                        <div class="info-label">Timezone</div>
+                        <div class="info-value" id="displayTimezone" data-timezone-value="{{ profile_timezone }}">{{ profile_timezone_label }}</div>
+                    </div>
+                </div>
+            <div class="info-item">
+                <i class="bi bi-calendar-event"></i>
+                <div>
+                    <div class="info-label">Local Date</div>
+                    <div class="info-value" id="displayLocalDate">{{ profile_local_date }}</div>
+                </div>
+            </div>
+            <div class="info-item">
+                <i class="bi bi-alarm"></i>
+                <div>
+                    <div class="info-label">Local Time</div>
+                    <div class="info-value" id="displayLocalTime">{{ profile_local_time }}</div>
+                </div>
+            </div>
+            <div class="info-item">
+                <i class="bi bi-calendar-check"></i>
+                <div>
+                    <div class="info-label">Joined</div>
+                    <div class="info-value" id="displayJoined">{{ profile_joined }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="skills-section">
+            <div class="section-title">Skills & Technologies</div>
+            <div id="skillsContainer">
+                {% for skill in profile_skills %}
+                <span class="skill-tag"><i class="bi bi-tag"></i> {{ skill }}</span>
+                {% endfor %}
+            </div>
+        </div>
+
+        <button class="edit-btn" data-bs-toggle="modal" data-bs-target="#editProfileModal">
+            <i class="bi bi-pencil-square"></i> Edit Profile
+        </button>
+    </div>
+</div>
+
+<!-- Edit Profile Modal -->
+<div class="modal fade" id="editProfileModal" tabindex="-1" aria-labelledby="editProfileModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl profile-edit-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editProfileModalLabel">
+                    <i class="bi bi-person-gear"></i> Edit Profile
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editProfileForm">
+                    <div class="edit-profile-grid">
+                        <div class="mb-3">
+                            <label class="form-label">Full Name</label>
+                            <input type="text" class="form-control" id="editName" value="{{ user.display_name }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Role</label>
+                            <input type="text" class="form-control" id="editRole" value="{{ profile_role }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" id="editEmail" value="{{ user.email }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Team</label>
+                            <input type="text" class="form-control" id="editTeam" value="{{ profile_team }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Location</label>
+                            <input type="text" class="form-control" id="editLocation" value="{{ profile_location }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Timezone</label>
+                            <select class="form-select" id="editTimezone">
+                                {% for option in timezone_options %}
+                                <option value="{{ option.value }}" {% if option.selected %}selected{% endif %}>{{ option.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Skills (comma separated)</label>
+                            <input type="text" class="form-control" id="editSkills"
+                                value="{{ profile_skills|join:', ' }}">
+                        </div>
+                        <div class="mb-3 edit-profile-bio">
+                            <label class="form-label">Bio</label>
+                            <textarea class="form-control" id="editBio" rows="5">{{ profile_bio }}</textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary-custom" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn-primary-custom" id="saveProfileBtn">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+    const uploadProfileAvatarUrl = "{% url 'upload_profile_avatar' %}";
+</script>
+{% endblock %}

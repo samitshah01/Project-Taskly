@@ -1,10 +1,28 @@
 document.addEventListener("DOMContentLoaded", function () {
-    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    fetch(setTimezoneUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
-        body: JSON.stringify({ timezone: timezone })
-    }).catch(() => {});
+    function renderAvatarContent(avatarUrl, initials, altText = "Avatar") {
+        const safeAltText = String(altText || "Avatar").replace(/"/g, "&quot;");
+        return avatarUrl
+            ? `<img src="${avatarUrl}" alt="${safeAltText}" class="avatar-media avatar-media-cover">`
+            : (initials || "");
+    }
+
+    function syncUserAvatar(userId, initials, avatarUrl, altText = "Avatar") {
+        if (!userId) return;
+        document.querySelectorAll(`[data-avatar-user-id="${userId}"]`).forEach(node => {
+            node.dataset.avatarInitials = initials || node.dataset.avatarInitials || "";
+            node.innerHTML = renderAvatarContent(avatarUrl, node.dataset.avatarInitials, altText);
+        });
+    }
+
+    const savedTimezone = document.body?.dataset?.userTimezone || "";
+    if (!savedTimezone) {
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        fetch(setTimezoneUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+            body: JSON.stringify({ timezone: timezone })
+        }).catch(() => {});
+    }
 
     const sidebar = document.getElementById("sidebar");
     const overlay = document.getElementById("sidebarOverlay");
@@ -161,6 +179,23 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (document.getElementById("colorPicker")) {
         setupColorIconPicker("colorPicker", "iconPicker", "selectedProjectColor", "selectedProjectIcon", "#4f7cff", "globe");
+    }
+
+    const createTeamSearch = document.getElementById("createTeamSearch");
+    const createTeamOptions = document.querySelectorAll(".create-team-list .manage-team-option");
+    if (createTeamSearch && createTeamOptions.length) {
+        const filterCreateTeamOptions = () => {
+            const query = createTeamSearch.value.trim().toLowerCase();
+            createTeamOptions.forEach(option => {
+                const haystack = option.dataset.memberSearch || "";
+                option.style.display = query && haystack.includes(query) ? "" : "none";
+            });
+        };
+
+        filterCreateTeamOptions();
+        createTeamSearch.addEventListener("input", () => {
+            filterCreateTeamOptions();
+        });
     }
 
     const editProjectModalEl = document.getElementById("editProjectModal");
@@ -337,7 +372,7 @@ document.addEventListener("DOMContentLoaded", function () {
             item.innerHTML = `
                 <div class="task-comment-head">
                     <div class="d-flex align-items-center gap-2">
-                        <div class="task-comment-avatar">${comment.user_initials}</div>
+                        <div class="task-comment-avatar" data-avatar-user-id="${comment.user_id || ""}" data-avatar-initials="${comment.user_initials || ""}">${renderAvatarContent(comment.user_avatar_url, comment.user_initials, comment.user_name || "Avatar")}</div>
                         <strong>${comment.user_name}</strong>
                     </div>
                     <span>${comment.created_at}</span>
@@ -394,7 +429,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const avatarWrap = taskEl.querySelector(".match-task-avatars");
         if (avatarWrap) {
             avatarWrap.innerHTML = task.assigned_to_initials
-                ? `<div class="proj-ava" style="background:var(--accent);">${task.assigned_to_initials}</div>`
+                ? `<div class="proj-ava" style="background:var(--accent);" data-avatar-user-id="${task.assigned_to_id || ""}" data-avatar-initials="${task.assigned_to_initials || ""}">${renderAvatarContent(task.assigned_to_avatar_url, task.assigned_to_initials, task.assigned_to_name || "Assignee")}</div>`
                 : "";
         }
 
@@ -532,7 +567,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (existing) existing.remove();
 
                 renderComments([payload.comment, ...Array.from(taskCommentsList.querySelectorAll(".task-comment-item")).map(node => ({
-                    user_initials: node.querySelector(".task-comment-avatar").textContent,
+                    user_id: node.querySelector(".task-comment-avatar")?.dataset.avatarUserId || "",
+                    user_initials: node.querySelector(".task-comment-avatar")?.dataset.avatarInitials || node.querySelector(".task-comment-avatar")?.textContent || "",
+                    user_avatar_url: node.querySelector(".task-comment-avatar img")?.getAttribute("src") || "",
                     user_name: node.querySelector("strong").textContent,
                     created_at: node.querySelector(".task-comment-head span").textContent,
                     comment: node.querySelector(".task-comment-body").textContent
@@ -556,9 +593,19 @@ document.addEventListener("DOMContentLoaded", function () {
             const editBtn = event.target.closest(".task-edit-trigger");
             const moveBtn = event.target.closest(".task-move-trigger");
             const deleteBtn = event.target.closest(".task-delete-trigger");
+            const taskMenuBtn = event.target.closest(".match-task-menu");
+            const taskDropdown = event.target.closest(".board-task-dropdown");
             const taskEl = event.target.closest(".match-task");
 
             if (editBtn && taskEl) {
+                try {
+                    await openTaskEditor(taskEl);
+                } catch (error) {
+                    showToast("error", error.message);
+                }
+            }
+
+            if (taskEl && !editBtn && !moveBtn && !deleteBtn && !taskMenuBtn && !taskDropdown) {
                 try {
                     await openTaskEditor(taskEl);
                 } catch (error) {
@@ -671,7 +718,88 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
+    const notificationToggle = document.getElementById("notificationToggle");
+    const notificationDropdown = notificationToggle?.closest(".dropdown");
+    const notificationSubtitle = document.querySelector("[data-notification-subtitle]");
+
+    function clearNotificationUnreadState() {
+        if (notificationToggle) {
+            notificationToggle.dataset.unreadCount = "0";
+            const badge = notificationToggle.querySelector("[data-notification-badge]");
+            if (badge) badge.remove();
+        }
+
+        document.querySelectorAll("[data-notification-item]").forEach(item => {
+            item.classList.remove("is-unread");
+        });
+
+        document.querySelectorAll("[data-notification-item-dot]").forEach(dot => dot.remove());
+
+        if (notificationSubtitle) {
+            const hasNotifications = document.querySelectorAll("[data-notification-item]").length > 0;
+            notificationSubtitle.textContent = hasNotifications ? "All caught up" : "No notifications yet";
+        }
+    }
+
+    if (notificationDropdown && notificationToggle) {
+        notificationDropdown.addEventListener("show.bs.dropdown", async () => {
+            const unreadCount = Number(notificationToggle.dataset.unreadCount || "0");
+            const markReadUrl = notificationToggle.dataset.markReadUrl;
+            if (!markReadUrl || unreadCount <= 0 || notificationToggle.dataset.markingRead === "true") return;
+
+            notificationToggle.dataset.markingRead = "true";
+
+            try {
+                const response = await fetch(markReadUrl, {
+                    method: "POST",
+                    headers: {
+                        "X-CSRFToken": csrfToken,
+                        "X-Requested-With": "XMLHttpRequest"
+                    }
+                });
+                const payload = await response.json();
+                if (!response.ok || !payload.success) {
+                    throw new Error(payload.message || "Unable to mark notifications as read.");
+                }
+                clearNotificationUnreadState();
+            } catch (error) {
+                showToast("error", error.message);
+            } finally {
+                delete notificationToggle.dataset.markingRead;
+            }
+        });
+    }
+
     // Profile Page
+    function getTimezonePresentation(timezoneValue, fallbackLabel = "") {
+        try {
+            const now = new Date();
+            return {
+                label: fallbackLabel || timezoneValue,
+                date: new Intl.DateTimeFormat("en-US", {
+                    timeZone: timezoneValue,
+                    weekday: "long",
+                    year: "numeric",
+                    month: "long",
+                    day: "2-digit"
+                }).format(now),
+                time: new Intl.DateTimeFormat("en-US", {
+                    timeZone: timezoneValue,
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                    hour12: true
+                }).format(now)
+            };
+        } catch (error) {
+            return {
+                label: fallbackLabel || timezoneValue,
+                date: "",
+                time: ""
+            };
+        }
+    }
+
     const saveProfileBtn = document.getElementById("saveProfileBtn");
     if (saveProfileBtn) {
         saveProfileBtn.addEventListener("click", function () {
@@ -682,10 +810,9 @@ document.addEventListener("DOMContentLoaded", function () {
             const editTeam = document.getElementById("editTeam");
             const editLocation = document.getElementById("editLocation");
             const editTimezone = document.getElementById("editTimezone");
-            const editJoined = document.getElementById("editJoined");
             const editSkills = document.getElementById("editSkills");
 
-            if (!editName || !editRole || !editEmail || !editBio || !editTeam || !editLocation || !editTimezone || !editJoined || !editSkills) {
+            if (!editName || !editRole || !editEmail || !editBio || !editTeam || !editLocation || !editTimezone || !editSkills) {
                 console.warn("Edit profile form elements missing");
                 return;
             }
@@ -696,8 +823,9 @@ document.addEventListener("DOMContentLoaded", function () {
             const bio = editBio.value;
             const team = editTeam.value;
             const timezoneValue = editTimezone.value;
-            const joined = editJoined.value;
+            const timezoneLabel = editTimezone.options[editTimezone.selectedIndex]?.textContent || timezoneValue;
             const skills = editSkills.value.split(",").map(s => s.trim()).filter(s => s);
+            const timezonePresentation = getTimezonePresentation(timezoneValue, timezoneLabel);
 
             const displayName = document.getElementById("displayName");
             if (displayName) displayName.textContent = name;
@@ -710,14 +838,23 @@ document.addEventListener("DOMContentLoaded", function () {
             const displayTeam = document.getElementById("displayTeam");
             if (displayTeam) displayTeam.textContent = team;
             const displayLocation = document.getElementById("displayLocation");
-            if (displayLocation) displayLocation.textContent = location;
+            if (displayLocation) displayLocation.textContent = editLocation.value;
             const displayTimezone = document.getElementById("displayTimezone");
-            if (displayTimezone) displayTimezone.textContent = timezoneValue ? timezoneValue.split(" ")[0] : "";
-            const displayJoined = document.getElementById("displayJoined");
-            if (displayJoined) displayJoined.textContent = joined;
+            if (displayTimezone) {
+                displayTimezone.textContent = timezonePresentation.label;
+                displayTimezone.dataset.timezoneValue = timezoneValue;
+            }
+            const displayLocalDate = document.getElementById("displayLocalDate");
+            if (displayLocalDate) displayLocalDate.textContent = timezonePresentation.date;
+            const displayLocalTime = document.getElementById("displayLocalTime");
+            if (displayLocalTime) displayLocalTime.textContent = timezonePresentation.time;
 
             const avatarDisplay = document.getElementById("avatarDisplay");
-            if (avatarDisplay && name) avatarDisplay.textContent = name.split(" ").map(n => n[0]).join("").toUpperCase();
+            const nextInitials = name ? name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) : "";
+            if (avatarDisplay?.dataset?.avatarUserId) {
+                const currentAvatarUrl = avatarDisplay.querySelector("img")?.getAttribute("src") || "";
+                syncUserAvatar(avatarDisplay.dataset.avatarUserId, nextInitials, currentAvatarUrl, name || "Avatar");
+            }
 
             const skillsContainer = document.getElementById("skillsContainer");
             if (skillsContainer) {
@@ -749,16 +886,13 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (modal) modal.hide();
             }
 
-            const alert = document.createElement("div");
-            alert.className = "alert alert-success alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3";
-            alert.style.zIndex = "9999";
-            alert.style.minWidth = "300px";
-            alert.style.textAlign = "center";
-            alert.innerHTML = 'Profile updated successfully!<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
-            document.body.appendChild(alert);
-            setTimeout(() => {
-                if (alert && alert.remove) alert.remove();
-            }, 3000);
+            fetch(setTimezoneUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+                body: JSON.stringify({ timezone: timezoneValue })
+            }).catch(() => {});
+
+            showToast("success", "Profile updated successfully!");
         });
     }
 
@@ -772,7 +906,6 @@ document.addEventListener("DOMContentLoaded", function () {
             const displayTeam = document.getElementById("displayTeam");
             const displayLocation = document.getElementById("displayLocation");
             const displayTimezone = document.getElementById("displayTimezone");
-            const displayJoined = document.getElementById("displayJoined");
 
             const editName = document.getElementById("editName");
             const editRole = document.getElementById("editRole");
@@ -781,7 +914,6 @@ document.addEventListener("DOMContentLoaded", function () {
             const editTeam = document.getElementById("editTeam");
             const editLocation = document.getElementById("editLocation");
             const editTimezone = document.getElementById("editTimezone");
-            const editJoined = document.getElementById("editJoined");
             const editSkills = document.getElementById("editSkills");
 
             if (editName && displayName) editName.value = displayName.textContent;
@@ -794,12 +926,40 @@ document.addEventListener("DOMContentLoaded", function () {
             if (editBio && displayBio) editBio.value = displayBio.textContent;
             if (editTeam && displayTeam) editTeam.value = displayTeam.textContent;
             if (editLocation && displayLocation) editLocation.value = displayLocation.textContent;
-            if (editTimezone && displayTimezone) editTimezone.value = displayTimezone.textContent;
-            if (editJoined && displayJoined) editJoined.value = displayJoined.textContent;
+            if (editTimezone && displayTimezone) editTimezone.value = displayTimezone.dataset.timezoneValue || editTimezone.value;
 
             const skillsContainer = document.getElementById("skillsContainer");
             if (editSkills && skillsContainer) {
                 editSkills.value = Array.from(skillsContainer.querySelectorAll(".skill-tag")).map(tag => tag.textContent.trim()).join(", ");
+            }
+        });
+    }
+
+    const profileAvatarTrigger = document.getElementById("profileAvatarTrigger");
+    const profileAvatarInput = document.getElementById("profileAvatarInput");
+    if (profileAvatarTrigger && profileAvatarInput && typeof uploadProfileAvatarUrl !== "undefined") {
+        profileAvatarTrigger.addEventListener("click", () => profileAvatarInput.click());
+        profileAvatarInput.addEventListener("change", async () => {
+            const file = profileAvatarInput.files?.[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append("avatar", file);
+
+            try {
+                const response = await fetch(uploadProfileAvatarUrl, {
+                    method: "POST",
+                    headers: { "X-CSRFToken": csrfToken },
+                    body: formData
+                });
+                const payload = await response.json();
+                if (!response.ok || !payload.success) throw new Error(payload.message || "Unable to upload photo.");
+                syncUserAvatar(payload.user_id, payload.user_initials, payload.avatar_url, "Profile photo");
+                showToast("success", payload.message);
+            } catch (error) {
+                showToast("error", error.message);
+            } finally {
+                profileAvatarInput.value = "";
             }
         });
     }

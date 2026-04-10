@@ -1166,50 +1166,6 @@ section {
     z-index: 100;
 }
 
-.topbar-title {
-    font-weight: 700;
-    font-size: 1.05rem;
-    white-space: nowrap;
-}
-
-.search-wrap {
-    flex: 1;
-    max-width: 340px;
-    position: relative;
-}
-
-.search-wrap i {
-    position: absolute;
-    left: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--muted);
-    font-size: 13px;
-    pointer-events: none;
-}
-
-.search-input {
-    width: 100%;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    color: var(--text);
-    padding: 7px 14px 7px 36px;
-    font-size: 13px;
-    font-family: "DM Sans", sans-serif;
-    transition: border-color 0.2s;
-}
-
-.search-input::placeholder {
-    color: var(--muted);
-}
-
-.search-input:focus {
-    outline: none;
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(79, 124, 255, 0.14);
-}
-
 .topbar-actions {
     display: flex;
     align-items: center;
@@ -1249,6 +1205,12 @@ section {
     border: 1.5px solid var(--surface);
 }
 
+.notification-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .avatar-btn {
     width: 36px;
     height: 36px;
@@ -1262,6 +1224,7 @@ section {
     font-size: 13px;
     color: #fff;
     cursor: pointer;
+    overflow: hidden;
 }
 
 .dropdown-menu-dark-custom {
@@ -1304,6 +1267,132 @@ section {
 
 .dropdown-menu-dark-custom .dropdown-divider {
     border-color: var(--border) !important;
+}
+
+.notifications-menu {
+    width: min(360px, calc(100vw - 32px));
+    padding: 0 !important;
+    overflow: hidden;
+}
+
+.notifications-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(79, 124, 255, 0.08), rgba(79, 124, 255, 0));
+}
+
+.notifications-title {
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.notifications-subtitle {
+    color: var(--muted);
+    font-size: 11px;
+    margin-top: 3px;
+}
+
+.notifications-list {
+    max-height: 360px;
+    overflow-y: auto;
+    padding: 8px;
+}
+
+.notification-toast {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 12px 14px 14px;
+    border-radius: 12px;
+    box-shadow: none;
+    animation: none;
+    align-items: flex-start;
+}
+
+.notification-toast.is-unread {
+    background: rgba(79, 124, 255, 0.08);
+    border-color: rgba(79, 124, 255, 0.3);
+}
+
+.notification-toast + .notification-toast {
+    margin-top: 4px;
+}
+
+.notification-toast:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.notification-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.notification-copy {
+    min-width: 0;
+    flex: 1;
+}
+
+.notification-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-top: 6px;
+    flex-shrink: 0;
+}
+
+.notification-text {
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.notifications-empty {
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.notifications-empty i {
+    font-size: 20px;
+}
+
+.profile-edit-dialog {
+    max-width: min(960px, calc(100vw - 32px));
+}
+
+.edit-profile-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 18px;
+}
+
+.edit-profile-grid .mb-3 {
+    margin-bottom: 0 !important;
+}
+
+.edit-profile-bio {
+    grid-column: 1 / -1;
 }
 
 .content-scroll {
@@ -1525,6 +1614,7 @@ section {
     justify-content: center;
     color: #fff;
     flex-shrink: 0;
+    overflow: hidden;
 }
 
 .act-text {
@@ -3510,6 +3600,38 @@ section {
     font-weight: 800;
     color: #fff;
     border: 4px solid var(--surface);
+    overflow: hidden;
+}
+
+.avatar-media {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.avatar-media-cover {
+    object-fit: cover;
+}
+
+.avatar-upload-trigger {
+    margin: 0 auto 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    transition: border-color 0.18s ease, transform 0.18s ease, background 0.18s ease;
+}
+
+.avatar-upload-trigger:hover {
+    border-color: rgba(79, 124, 255, 0.4);
+    background: rgba(79, 124, 255, 0.08);
+    transform: translateY(-1px);
 }
 
 .avatar-online {
@@ -3837,6 +3959,10 @@ section {
     }
 
     .info-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .edit-profile-grid {
         grid-template-columns: 1fr;
     }
 }
@@ -4229,6 +4355,7 @@ section {
     color: #fff;
     border: 2px solid var(--surface);
     font-family: var(--font, 'Poppins', sans-serif);
+    overflow: hidden;
 }
 
 .proj-ava+.proj-ava {
@@ -4256,7 +4383,8 @@ section {
     gap: 10px;
     max-height: 280px;
     overflow-y: auto;
-    padding-right: 4px;
+    padding: 4px 4px 4px 0;
+    scroll-padding-top: 4px;
 }
 
 .manage-team-option {
@@ -4266,6 +4394,7 @@ section {
     gap: 14px;
     background: var(--surface2);
     border: 1px solid var(--border);
+    min-width: 0;
     border-radius: 16px;
     padding: 12px 14px;
     cursor: pointer;
@@ -4288,6 +4417,7 @@ section {
     align-items: center;
     gap: 12px;
     min-width: 0;
+    flex: 1;
 }
 
 .manage-team-avatar {
@@ -4304,6 +4434,8 @@ section {
     display: flex;
     flex-direction: column;
     min-width: 0;
+    flex: 1;
+    overflow: hidden;
 }
 
 .manage-team-name {
@@ -4311,6 +4443,9 @@ section {
     font-size: 14px;
     font-weight: 600;
     line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .manage-team-handle {
@@ -4318,6 +4453,9 @@ section {
     font-size: 12px;
     line-height: 1.2;
     margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .manage-team-check {
@@ -4331,6 +4469,14 @@ section {
     font-size: 11px;
     color: var(--muted);
     margin-top: 10px;
+}
+
+.create-team-list {
+    max-height: 170px;
+}
+
+.create-team-search {
+    margin-bottom: 10px;
 }
 
 .proj-budget {
@@ -4780,6 +4926,7 @@ section {
     padding: 16px 14px 14px;
     box-shadow: 0 10px 22px rgba(0, 0, 0, 0.16);
     transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+    cursor: pointer;
 }
 
 .match-task:hover {
@@ -4924,6 +5071,7 @@ section {
     font-size: 11px;
     font-weight: 700;
     flex-shrink: 0;
+    overflow: hidden;
 }
 
 .task-comment-body {

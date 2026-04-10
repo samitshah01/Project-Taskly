@@ -15,7 +15,7 @@
     {% block extra_css %}{% endblock %}
 </head>
 
-<body>
+<body data-user-timezone="{{ request.session.user_timezone|default:'' }}">
     <div class="app-shell">
         {% include 'components/dashboard_navbar.html' %}
 

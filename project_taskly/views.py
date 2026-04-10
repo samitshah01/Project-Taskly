@@ -1,11 +1,14 @@
 import re
 import json
+import os
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError, available_timezones
 from decimal import Decimal, InvalidOperation
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.utils import timezone
 from django.urls import reverse
 from django.utils.timesince import timesince
+from django.utils.dateparse import parse_datetime
 from django.contrib.auth.hashers import check_password
 from django.views.decorators.csrf import csrf_protect
 from django.db.models import Count, Q, Sum, Case, When, IntegerField
@@ -17,6 +20,41 @@ from django.views.decorators.http import require_POST
 import logging
 
 logger = logging.getLogger(__name__)
+NOTIFICATIONS_LAST_SEEN_SESSION_KEY = 'notifications_last_seen_at'
+
+
+def format_utc_offset(offset):
+    total_minutes = int((offset.total_seconds() if offset else 0) // 60)
+    sign = "+" if total_minutes >= 0 else "-"
+    total_minutes = abs(total_minutes)
+    hours, minutes = divmod(total_minutes, 60)
+    return f"UTC{sign}{hours:02d}:{minutes:02d}"
+
+
+def get_safe_timezone(tz_name):
+    try:
+        return ZoneInfo(tz_name)
+    except ZoneInfoNotFoundError:
+        return ZoneInfo("UTC")
+
+
+def build_timezone_options(selected_timezone):
+    reference_now = timezone.now()
+    options = []
+
+    for tz_name in sorted(available_timezones()):
+        if tz_name.startswith("Etc/"):
+            continue
+
+        zone = get_safe_timezone(tz_name)
+        localized_now = reference_now.astimezone(zone)
+        options.append({
+            "value": tz_name,
+            "label": f"{tz_name.replace('_', ' ')} ({format_utc_offset(localized_now.utcoffset())})",
+            "selected": tz_name == selected_timezone,
+        })
+
+    return options
 
 
 def build_project_summary(project):
@@ -57,8 +95,10 @@ def build_task_payload(task):
     comments = [
         {
             'id': comment.id,
+            'user_id': comment.user.id,
             'user_name': comment.user.display_name,
             'user_initials': comment.user.initials,
+            'user_avatar_url': comment.user.avatar_url,
             'comment': comment.comment,
             'created_at': f"{timesince(comment.created_at)} ago",
         }
@@ -90,6 +130,7 @@ def build_task_payload(task):
         'assigned_to_id': task.assigned_to_id,
         'assigned_to_name': task.assigned_to.display_name if task.assigned_to else '',
         'assigned_to_initials': task.assigned_to.initials if task.assigned_to else '',
+        'assigned_to_avatar_url': task.assigned_to.avatar_url if task.assigned_to else '',
         'comment_count': len(comments),
         'comments': comments,
         'members': member_options,
@@ -113,13 +154,32 @@ def get_status_badge_color(status):
     }.get(status, 'var(--muted)')
 
 
-def build_dashboard_base_context(user):
+def get_notifications_last_seen(request):
+    raw_value = request.session.get(NOTIFICATIONS_LAST_SEEN_SESSION_KEY)
+    if not raw_value:
+        return None
+
+    parsed_value = parse_datetime(raw_value)
+    if not parsed_value:
+        return None
+
+    if timezone.is_naive(parsed_value):
+        return timezone.make_aware(parsed_value, timezone.get_current_timezone())
+    return parsed_value
+
+
+def build_dashboard_base_context(request, user):
     project_count = Project.objects.count()
     task_count = Task.objects.count()
     task_projects = Project.objects.prefetch_related('project_members__user').order_by('name')
-    notification_count = ActivityLog.objects.filter(
+    notifications_last_seen = get_notifications_last_seen(request)
+    notification_qs = ActivityLog.objects.select_related('user', 'project', 'task').filter(
         Q(user=user) | Q(project__project_members__user=user)
-    ).distinct().count()
+    ).distinct()
+    notification_count = notification_qs.count()
+    notification_unread_count = notification_qs.filter(
+        timestamp__gt=notifications_last_seen
+    ).count() if notifications_last_seen else notification_count
 
     task_project_member_map = {}
     for project in task_projects:
@@ -129,14 +189,31 @@ def build_dashboard_base_context(user):
                 'name': member.user.display_name,
             }
             for member in project.project_members.all()
+            if member.user_id != user.id
         ]
+
+    recent_notifications = [
+        {
+            'user_id': log.user.id,
+            'user_initials': log.user.initials,
+            'user_avatar_url': log.user.avatar_url,
+            'user_name': log.user.display_name,
+            'action': log.action,
+            'timestamp': f"{timesince(log.timestamp)} ago",
+            'is_unread': log.timestamp > notifications_last_seen if notifications_last_seen else True,
+        }
+        for log in notification_qs[:6]
+    ]
 
     return {
         'user': user,
         'sidebar_project_count': project_count,
         'sidebar_task_count': task_count,
         'notification_count': notification_count,
+        'notification_unread_count': notification_unread_count,
+        'recent_notifications': recent_notifications,
         'user_initials': user.initials,
+        'user_avatar_url': user.avatar_url,
         'task_project_options': task_projects,
         'task_project_member_map': task_project_member_map,
     }
@@ -148,12 +225,27 @@ def set_timezone(request):
         tz_name = data.get("timezone", "").strip()
 
         if tz_name:
+            get_safe_timezone(tz_name)
             request.session["user_timezone"] = tz_name
             return JsonResponse({"status": "ok", "timezone": tz_name})
 
         return JsonResponse({"status": "error", "message": "Timezone missing"}, status=400)
     except Exception:
         return JsonResponse({"status": "error", "message": "Invalid request"}, status=400)
+
+
+@require_POST
+def mark_notifications_read(request):
+    if not request.session.get('user_id'):
+        return JsonResponse({'success': False, 'message': 'Authentication required.'}, status=401)
+
+    user = get_current_user(request)
+    if not user:
+        request.session.flush()
+        return JsonResponse({'success': False, 'message': 'User not found.'}, status=401)
+
+    request.session[NOTIFICATIONS_LAST_SEEN_SESSION_KEY] = timezone.now().isoformat()
+    return JsonResponse({'success': True, 'message': 'Notifications marked as read.', 'unread_count': 0})
 
 def index(request):
     return render(request, 'index.html')
@@ -478,7 +570,7 @@ def dashboard(request):
         ).distinct()[:5]
     )
 
-    context = build_dashboard_base_context(user)
+    context = build_dashboard_base_context(request, user)
     context.update({
         "greeting": greeting,
         "greeting_icon": greeting_icon,
@@ -595,12 +687,12 @@ def projects(request):
         on_hold=Count('id', filter=Q(status=Project.STATUS_ON_HOLD)),
     )
 
-    context = build_dashboard_base_context(user)
+    context = build_dashboard_base_context(request, user)
     context.update({
         'projects': project_cards,
         'project_status_counts': status_counts,
         'project_total_budget': total_budget,
-        'team_options': Users.objects.order_by('first_name', 'last_name', 'username'),
+        'team_options': Users.objects.exclude(id=user.id).order_by('first_name', 'last_name', 'username'),
         'project_color_options': ['#4f7cff', '#7c5cfc', '#30d87d', '#ffb547', '#ff5470', '#00d4aa', '#e06030', '#8b5cf6'],
         'project_icon_options': ['globe', 'server', 'diagram-3', 'people', 'phone', 'bar-chart-line', 'shield-lock', 'lightning-charge', 'brush', 'gear'],
     })
@@ -787,7 +879,7 @@ def project_board(request, project_id):
 
     recent_activity = list(project.activity_logs.all().order_by('-timestamp')[:5])
 
-    context = build_dashboard_base_context(user)
+    context = build_dashboard_base_context(request, user)
     context.update({
         'project': project,
         'project_summary': summary,
@@ -975,8 +1067,10 @@ def add_task_comment(request, task_id):
         'message': 'Comment added.',
         'comment': {
             'id': comment.id,
+            'user_id': user.id,
             'user_name': user.display_name,
             'user_initials': user.initials,
+            'user_avatar_url': user.avatar_url,
             'comment': comment.comment,
             'created_at': 'just now',
         }
@@ -1106,4 +1200,71 @@ def profile(request):
         request.session.flush()
         return redirect('login')
 
-    return render(request, 'dashboard/profile.html', build_dashboard_base_context(user))
+    timezone_name = request.session.get('user_timezone') or timezone.get_current_timezone_name()
+    profile_zone = get_safe_timezone(timezone_name)
+    profile_now = timezone.now().astimezone(profile_zone)
+    managed_project = Project.objects.filter(manager=user).order_by('name').first()
+    member_project = Project.objects.filter(project_members__user=user).order_by('name').first()
+
+    context = build_dashboard_base_context(request, user)
+    context.update({
+        'profile_role': (user.role or 'User').replace('_', ' ').title(),
+        'profile_joined': user.created_at.strftime('%b %Y') if user.created_at else 'Recently',
+        'profile_timezone': timezone_name,
+        'profile_timezone_label': f"{timezone_name.replace('_', ' ')} ({format_utc_offset(profile_now.utcoffset())})",
+        'profile_local_date': profile_now.strftime('%A, %B %d, %Y'),
+        'profile_local_time': profile_now.strftime('%I:%M:%S %p'),
+        'profile_team': managed_project.name if managed_project else (member_project.name if member_project else 'Taskly Workspace'),
+        'profile_location': 'Kathmandu, NP',
+        'profile_bio': f'{user.display_name} is collaborating in Taskly and keeping projects on track.',
+        'profile_skills': ['Task Management', 'Project Planning', 'Team Collaboration'],
+        'timezone_options': build_timezone_options(timezone_name),
+    })
+    return render(request, 'dashboard/profile.html', context)
+
+
+@require_POST
+@csrf_protect
+def upload_profile_avatar(request):
+    if not request.session.get('user_id'):
+        return JsonResponse({'success': False, 'message': 'Authentication required.'}, status=401)
+
+    user = get_current_user(request)
+    if not user:
+        request.session.flush()
+        return JsonResponse({'success': False, 'message': 'User not found.'}, status=401)
+
+    avatar = request.FILES.get('avatar')
+    if not avatar:
+        return JsonResponse({'success': False, 'message': 'Please choose an image.'}, status=400)
+
+    extension = os.path.splitext(avatar.name or "")[1].lower().lstrip(".")
+    allowed_extensions = {"jpg", "jpeg", "png", "webp", "gif"}
+    if extension not in allowed_extensions or not (avatar.content_type or "").startswith("image/"):
+        return JsonResponse({'success': False, 'message': 'Only image files are allowed.'}, status=400)
+
+    avatar_dir = os.path.join(settings.MEDIA_ROOT, "profile_avatars")
+    os.makedirs(avatar_dir, exist_ok=True)
+
+    for old_ext in allowed_extensions:
+        old_path = os.path.join(avatar_dir, f"user_{user.id}.{old_ext}")
+        if os.path.exists(old_path):
+            os.remove(old_path)
+
+    file_path = os.path.join(avatar_dir, f"user_{user.id}.{extension}")
+    with open(file_path, "wb+") as destination:
+        for chunk in avatar.chunks():
+            destination.write(chunk)
+
+    ActivityLog.objects.create(
+        user=user,
+        action='updated profile photo',
+    )
+
+    return JsonResponse({
+        'success': True,
+        'message': 'Profile photo updated.',
+        'user_id': user.id,
+        'avatar_url': user.avatar_url,
+        'user_initials': user.initials,
+    })

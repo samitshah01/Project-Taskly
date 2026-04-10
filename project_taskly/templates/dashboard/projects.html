@@ -6,7 +6,8 @@
 <div class="main-area">
     <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
         <div>
-            <h4 style="font-family:'Poppins',sans-serif;font-weight:800;font-size:1.25rem;margin-bottom:4px;">All Projects</h4>
+            <h4 style="font-family:'Poppins',sans-serif;font-weight:800;font-size:1.25rem;margin-bottom:4px;">All
+                Projects</h4>
             <p style="color:var(--muted);font-size:13px;margin:0;">
                 Manage and track all your team's projects in one place.
             </p>
@@ -70,13 +71,16 @@
 
     <div class="projects-grid" id="gridView">
         {% for item in projects %}
-        <article class="project-card project-card-shell" data-status="{{ item.object.status }}" data-name="{{ item.object.name|lower }}">
+        <article class="project-card project-card-shell" data-status="{{ item.object.status }}"
+            data-name="{{ item.object.name|lower }}">
             <a href="{% url 'project_board' item.object.id %}" class="project-card-link">
-                <div class="project-card-strip" style="background:linear-gradient(90deg,{{ item.object.color }},var(--accent2));"></div>
+                <div class="project-card-strip"
+                    style="background:linear-gradient(90deg,{{ item.object.color }},var(--accent2));"></div>
                 <div class="project-card-body">
                     <div class="project-card-top">
                         <div class="d-flex gap-3 align-items-start">
-                            <div class="project-icon-wrap" style="background:rgba(79,124,255,0.12);color:var(--accent);">
+                            <div class="project-icon-wrap"
+                                style="background:rgba(79,124,255,0.12);color:var(--accent);">
                                 <i class="bi bi-{{ item.object.icon }}"></i>
                             </div>
                             <div>
@@ -90,23 +94,28 @@
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark-custom board-task-dropdown">
                                 <li><button type="button" class="dropdown-item project-edit-trigger"
-                                    data-project-id="{{ item.object.id }}"
-                                    data-project-name="{{ item.object.name }}"
-                                    data-project-description="{{ item.object.description|default:'' }}"
-                                    data-project-status="{{ item.object.status }}"
-                                    data-project-budget="{{ item.object.budget }}"
-                                    data-project-start="{{ item.object.start_date|date:'Y-m-d' }}"
-                                    data-project-end="{% if item.object.end_date %}{{ item.object.end_date|date:'Y-m-d' }}{% endif %}"
-                                    data-project-color="{{ item.object.color }}"
-                                    data-project-icon="{{ item.object.icon }}"><i class="bi bi-pencil"></i> Edit Project</button></li>
+                                        data-project-id="{{ item.object.id }}"
+                                        data-project-name="{{ item.object.name }}"
+                                        data-project-description="{{ item.object.description|default:'' }}"
+                                        data-project-status="{{ item.object.status }}"
+                                        data-project-budget="{{ item.object.budget }}"
+                                        data-project-start="{{ item.object.start_date|date:'Y-m-d' }}"
+                                        data-project-end="{% if item.object.end_date %}{{ item.object.end_date|date:'Y-m-d' }}{% endif %}"
+                                        data-project-color="{{ item.object.color }}"
+                                        data-project-icon="{{ item.object.icon }}"><i class="bi bi-pencil"></i> Edit
+                                        Project</button></li>
                                 <li><button type="button" class="dropdown-item project-team-trigger"
-                                    data-project-id="{{ item.object.id }}"
-                                    data-project-name="{{ item.object.name }}"
-                                    data-project-members="{% for member in item.object.project_members.all %}{{ member.user.id }}{% if not forloop.last %},{% endif %}{% endfor %}"><i class="bi bi-people"></i> Manage Team</button></li>
-                                <li><hr class="dropdown-divider"></li>
+                                        data-project-id="{{ item.object.id }}"
+                                        data-project-name="{{ item.object.name }}"
+                                        data-project-members="{% for member in item.object.project_members.all %}{{ member.user.id }}{% if not forloop.last %},{% endif %}{% endfor %}"><i
+                                            class="bi bi-people"></i> Manage Team</button></li>
+                                <li>
+                                    <hr class="dropdown-divider">
+                                </li>
                                 <li><button type="button" class="dropdown-item text-danger project-delete-trigger"
-                                    data-project-id="{{ item.object.id }}"
-                                    data-project-name="{{ item.object.name }}"><i class="bi bi-trash"></i> Delete Project</button></li>
+                                        data-project-id="{{ item.object.id }}"
+                                        data-project-name="{{ item.object.name }}"><i class="bi bi-trash"></i> Delete
+                                        Project</button></li>
                             </ul>
                         </div>
                     </div>
@@ -117,7 +126,9 @@
                             <strong>{{ item.progress }}%</strong>
                         </div>
                         <div class="progress-track">
-                            <div class="progress-fill" style="width:{{ item.progress }}%;background:linear-gradient(90deg,{{ item.object.color }},var(--accent2));"></div>
+                            <div class="progress-fill"
+                                style="width:{{ item.progress }}%;background:linear-gradient(90deg,{{ item.object.color }},var(--accent2));">
+                            </div>
                         </div>
                     </div>
                     <div class="project-meta">
@@ -128,10 +139,10 @@
                 <div class="project-card-footer">
                     <div class="proj-team">
                         {% for member in item.members %}
-                            <div class="proj-ava" style="background:var(--accent);">{{ member.user.initials }}</div>
+                        <div class="proj-ava" style="background:var(--accent);" data-avatar-user-id="{{ member.user.id }}" data-avatar-initials="{{ member.user.initials }}">{% if member.user.avatar_url %}<img src="{{ member.user.avatar_url }}" alt="{{ member.user.display_name }}" class="avatar-media avatar-media-cover">{% else %}{{ member.user.initials }}{% endif %}</div>
                         {% endfor %}
                         {% if item.extra_members %}
-                            <div class="proj-ava-more">+{{ item.extra_members }}</div>
+                        <div class="proj-ava-more">+{{ item.extra_members }}</div>
                         {% endif %}
                     </div>
                     <div class="proj-budget"><i class="bi bi-cash-stack"></i> ${{ item.object.budget }}</div>
@@ -139,7 +150,7 @@
             </a>
         </article>
         {% empty %}
-            <p style="margin:0;color:var(--muted);font-size:13px;">No projects available yet.</p>
+        <p style="margin:0;color:var(--muted);font-size:13px;">No projects available yet.</p>
         {% endfor %}
     </div>
 
@@ -168,11 +179,13 @@
                         <div class="col-md-7">
                             <div class="mb-3">
                                 <label class="form-label">Project Name</label>
-                                <input type="text" class="form-control" name="name" placeholder="e.g. Website Revamp" required />
+                                <input type="text" class="form-control" name="name" placeholder="e.g. Website Revamp"
+                                    required />
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Description</label>
-                                <textarea class="form-control" name="description" rows="3" placeholder="Briefly describe the project goals" style="resize:none;"></textarea>
+                                <textarea class="form-control" name="description" rows="3"
+                                    placeholder="Briefly describe the project goals" style="resize:none;"></textarea>
                             </div>
                             <div class="row g-3">
                                 <div class="col-6">
@@ -186,7 +199,8 @@
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label">Budget ($)</label>
-                                    <input type="number" class="form-control" name="budget" min="0" step="0.01" placeholder="0.00" />
+                                    <input type="number" class="form-control" name="budget" min="0" step="0.01"
+                                        placeholder="0.00" />
                                 </div>
                             </div>
                             <div class="row g-3 mt-0">
@@ -206,7 +220,9 @@
                                 <label class="form-label">Project Colour</label>
                                 <div class="color-picker" id="colorPicker">
                                     {% for color in project_color_options %}
-                                        <button type="button" class="color-swatch {% if forloop.first %}selected{% endif %}" style="background:{{ color }};" data-color="{{ color }}" aria-label="Choose color {{ color }}"></button>
+                                    <button type="button" class="color-swatch {% if forloop.first %}selected{% endif %}"
+                                        style="background:{{ color }};" data-color="{{ color }}"
+                                        aria-label="Choose color {{ color }}"></button>
                                     {% endfor %}
                                 </div>
                             </div>
@@ -214,20 +230,37 @@
                                 <label class="form-label">Project Icon</label>
                                 <div class="icon-picker" id="iconPicker">
                                     {% for icon in project_icon_options %}
-                                        <button type="button" class="icon-opt {% if forloop.first %}selected{% endif %}" data-icon="{{ icon }}" aria-label="Choose icon {{ icon }}">
-                                            <i class="bi bi-{{ icon }}"></i>
-                                        </button>
+                                    <button type="button" class="icon-opt {% if forloop.first %}selected{% endif %}"
+                                        data-icon="{{ icon }}" aria-label="Choose icon {{ icon }}">
+                                        <i class="bi bi-{{ icon }}"></i>
+                                    </button>
                                     {% endfor %}
                                 </div>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Assign Members</label>
-                                <select class="form-select" name="members" multiple style="height:150px;">
+                                <input type="text" id="createTeamSearch" class="form-control create-team-search"
+                                    placeholder="Search members" autocomplete="off" />
+                                <div class="manage-team-list create-team-list">
                                     {% for member in team_options %}
-                                        <option value="{{ member.id }}">{{ member.display_name }}</option>
+                                    <label class="manage-team-option" for="create-member-{{ member.id }}"
+                                        data-member-search="{{ member.display_name|lower }} {% if member.username %}@{{ member.username|lower }}{% endif %}">
+                                        <span class="manage-team-user">
+                                            <span class="proj-ava manage-team-avatar" data-avatar-user-id="{{ member.id }}" data-avatar-initials="{{ member.initials }}">{% if member.avatar_url %}<img src="{{ member.avatar_url }}" alt="{{ member.display_name }}" class="avatar-media avatar-media-cover">{% else %}{{ member.initials }}{% endif %}</span>
+                                            <span class="manage-team-meta">
+                                                <span class="manage-team-name">{{ member.display_name }}</span>
+                                                {% if member.username %}
+                                                <span class="manage-team-handle">@{{ member.username }}</span>
+                                                {% endif %}
+                                            </span>
+                                        </span>
+                                        <input type="checkbox" name="members" value="{{ member.id }}"
+                                            id="create-member-{{ member.id }}" class="manage-team-check" />
+                                    </label>
                                     {% endfor %}
-                                </select>
-                                <div style="font-size:11px;color:var(--muted);margin-top:5px;">Hold Ctrl / Cmd to select multiple team members.</div>
+                                </div>
+                                <div class="manage-team-note">Choose the teammates who should be added to this project.
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -263,7 +296,8 @@
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Description</label>
-                                <textarea class="form-control" name="description" id="editProjectDescription" rows="3" style="resize:none;"></textarea>
+                                <textarea class="form-control" name="description" id="editProjectDescription" rows="3"
+                                    style="resize:none;"></textarea>
                             </div>
                             <div class="row g-3">
                                 <div class="col-6">
@@ -277,13 +311,15 @@
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label">Budget ($)</label>
-                                    <input type="number" class="form-control" name="budget" id="editProjectBudget" min="0" step="0.01" />
+                                    <input type="number" class="form-control" name="budget" id="editProjectBudget"
+                                        min="0" step="0.01" />
                                 </div>
                             </div>
                             <div class="row g-3 mt-0">
                                 <div class="col-6">
                                     <label class="form-label">Start Date</label>
-                                    <input type="date" class="form-control" name="start_date" id="editProjectStart" required />
+                                    <input type="date" class="form-control" name="start_date" id="editProjectStart"
+                                        required />
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label">Deadline</label>
@@ -296,7 +332,8 @@
                                 <label class="form-label">Project Colour</label>
                                 <div class="color-picker" id="editColorPicker">
                                     {% for color in project_color_options %}
-                                        <button type="button" class="color-swatch" style="background:{{ color }};" data-color="{{ color }}" aria-label="Choose color {{ color }}"></button>
+                                    <button type="button" class="color-swatch" style="background:{{ color }};"
+                                        data-color="{{ color }}" aria-label="Choose color {{ color }}"></button>
                                     {% endfor %}
                                 </div>
                             </div>
@@ -304,9 +341,10 @@
                                 <label class="form-label">Project Icon</label>
                                 <div class="icon-picker" id="editIconPicker">
                                     {% for icon in project_icon_options %}
-                                        <button type="button" class="icon-opt" data-icon="{{ icon }}" aria-label="Choose icon {{ icon }}">
-                                            <i class="bi bi-{{ icon }}"></i>
-                                        </button>
+                                    <button type="button" class="icon-opt" data-icon="{{ icon }}"
+                                        aria-label="Choose icon {{ icon }}">
+                                        <i class="bi bi-{{ icon }}"></i>
+                                    </button>
                                     {% endfor %}
                                 </div>
                             </div>
@@ -336,18 +374,19 @@
                     <label class="form-label">Team Members</label>
                     <div class="manage-team-list" id="manageTeamMembers">
                         {% for member in team_options %}
-                            <label class="manage-team-option" for="manage-member-{{ member.id }}">
-                                <span class="manage-team-user">
-                                    <span class="proj-ava manage-team-avatar">{{ member.initials }}</span>
-                                    <span class="manage-team-meta">
-                                        <span class="manage-team-name">{{ member.display_name }}</span>
-                                        {% if member.username %}
-                                        <span class="manage-team-handle">@{{ member.username }}</span>
-                                        {% endif %}
-                                    </span>
+                        <label class="manage-team-option" for="manage-member-{{ member.id }}">
+                            <span class="manage-team-user">
+                                <span class="proj-ava manage-team-avatar" data-avatar-user-id="{{ member.id }}" data-avatar-initials="{{ member.initials }}">{% if member.avatar_url %}<img src="{{ member.avatar_url }}" alt="{{ member.display_name }}" class="avatar-media avatar-media-cover">{% else %}{{ member.initials }}{% endif %}</span>
+                                <span class="manage-team-meta">
+                                    <span class="manage-team-name">{{ member.display_name }}</span>
+                                    {% if member.username %}
+                                    <span class="manage-team-handle">@{{ member.username }}</span>
+                                    {% endif %}
                                 </span>
-                                <input type="checkbox" name="members" value="{{ member.id }}" id="manage-member-{{ member.id }}" class="manage-team-check" />
-                            </label>
+                            </span>
+                            <input type="checkbox" name="members" value="{{ member.id }}"
+                                id="manage-member-{{ member.id }}" class="manage-team-check" />
+                        </label>
                         {% endfor %}
                     </div>
                     <div class="manage-team-note">Select the teammates who should have access to this project.</div>
@@ -371,7 +410,8 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <p style="margin:0;color:var(--muted);font-size:14px;">Delete <strong id="deleteProjectName"></strong>? This will also remove its related tasks and activity.</p>
+                    <p style="margin:0;color:var(--muted);font-size:14px;">Delete <strong
+                            id="deleteProjectName"></strong>? This will also remove its related tasks and activity.</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn-ghost" data-bs-dismiss="modal">Cancel</button>

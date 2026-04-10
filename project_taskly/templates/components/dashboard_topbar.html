@@ -1,18 +1,62 @@
 <header class="topbar">
     <button class="icon-btn d-lg-none border-0" id="sidebarToggle"><i class="bi bi-list"></i></button>
-    <span class="topbar-title d-none d-md-block">Dashboard</span>
-    <div class="search-wrap">
-        <i class="bi bi-search"></i>
-        <input type="text" class="search-input" placeholder="Search tasks, projects…" />
-    </div>
     <div class="topbar-actions">
-        <div class="icon-btn"><i class="bi bi-bell"></i>{% if notification_count %}<span class="notif-dot"></span>{% endif %}</div>
-        <button class="btn-primary-custom" data-bs-toggle="modal" data-bs-target="#addTaskModal"
-            style="display:flex;align-items:center;gap:6px;padding:7px 14px;">
-            <i class="bi bi-plus-lg" style="font-size:13px;"></i> New Task
-        </button>
         <div class="dropdown">
-            <div class="avatar-btn" data-bs-toggle="dropdown" aria-expanded="false">{{ user_initials }}</div>
+            <button class="icon-btn notification-btn" id="notificationToggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Notifications" data-mark-read-url="{% url 'mark_notifications_read' %}" data-unread-count="{{ notification_unread_count }}">
+                <i class="bi bi-bell"></i>
+                {% if notification_unread_count %}<span class="notif-dot" data-notification-badge></span>{% endif %}
+            </button>
+            <div class="dropdown-menu dropdown-menu-end dropdown-menu-dark-custom notifications-menu">
+                <div class="notifications-head">
+                    <div>
+                        <div class="notifications-title">Notifications</div>
+                        <div class="notifications-subtitle" data-notification-subtitle>
+                            {% if notification_unread_count %}
+                                {{ notification_unread_count }} unread update{{ notification_unread_count|pluralize }}
+                            {% elif notification_count %}
+                                All caught up
+                            {% else %}
+                                No notifications yet
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="notifications-list">
+                    {% for notification in recent_notifications %}
+                        <div class="toast-item toast-info notification-toast{% if notification.is_unread %} is-unread{% endif %}" data-notification-item>
+                            <div class="notification-avatar" data-avatar-user-id="{{ notification.user_id }}" data-avatar-initials="{{ notification.user_initials }}">
+                                {% if notification.user_avatar_url %}
+                                <img src="{{ notification.user_avatar_url }}" alt="{{ notification.user_name }}" class="avatar-media avatar-media-cover">
+                                {% else %}
+                                {{ notification.user_initials }}
+                                {% endif %}
+                            </div>
+                            <div class="toast-body notification-copy">
+                                <div class="toast-title notification-text"><strong>{{ notification.user_name }}</strong> {{ notification.action }}</div>
+                                <div class="toast-message notification-time">{{ notification.timestamp }}</div>
+                            </div>
+                            {% if notification.is_unread %}
+                            <span class="notification-status-dot" data-notification-item-dot aria-hidden="true"></span>
+                            {% endif %}
+                            <div class="toast-progress"></div>
+                        </div>
+                    {% empty %}
+                        <div class="notifications-empty">
+                            <i class="bi bi-bell-slash"></i>
+                            <span>No notifications yet.</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="dropdown">
+            <div class="avatar-btn" data-bs-toggle="dropdown" aria-expanded="false" data-avatar-user-id="{{ user.id }}" data-avatar-initials="{{ user.initials }}">
+                {% if user_avatar_url %}
+                <img src="{{ user_avatar_url }}" alt="{{ user.display_name }}" class="avatar-media avatar-media-cover">
+                {% else %}
+                {{ user_initials }}
+                {% endif %}
+            </div>
             <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark-custom">
                 <li>
                     <div style="padding:10px 12px 8px;border-bottom:1px solid var(--border);margin-bottom:6px;">
@@ -28,7 +72,7 @@
                         </div>
                     </div>
                 </li>
-                <li><a class="dropdown-item" href="#"><i class="bi bi-person"></i> Profile</a></li>
+                <li><a class="dropdown-item" href="{% url 'profile' %}"><i class="bi bi-person"></i> Profile</a></li>
                 <li><a class="dropdown-item" href="#"><i class="bi bi-gear"></i> Settings</a></li>
                 <li>
                     <hr class="dropdown-divider">

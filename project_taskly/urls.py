@@ -4,6 +4,7 @@ from . import views
 urlpatterns = [
     path('', views.index, name='index'),
     path('set-timezone/', views.set_timezone, name='set_timezone'),
+    path('notifications/mark-read/', views.mark_notifications_read, name='mark_notifications_read'),
     path('login/', views.login, name='login'),
     path('check-username/', views.check_username, name='check_username'),
     
@@ -28,5 +29,6 @@ urlpatterns = [
     path('dashboard/projects', views.projects, name='projects'),
     path('dashboard/projects/<int:project_id>/', views.project_board, name='project_board'),
     path('dashboard/profile', views.profile, name='profile'),
+    path('dashboard/profile/avatar/', views.upload_profile_avatar, name='upload_profile_avatar'),
     path('logout/', views.logout, name='logout'),
 ]

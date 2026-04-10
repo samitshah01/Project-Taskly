@@ -1,3 +1,5 @@
+import os
+from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.hashers import make_password, check_password
@@ -44,6 +46,26 @@ class Users(models.Model):
         if self.username:
             return self.username[:2].upper()
         return self.email[:2].upper()
+
+    @property
+    def avatar_relative_path(self):
+        if not self.id:
+            return ""
+        for ext in ("jpg", "jpeg", "png", "webp", "gif"):
+            relative = f"profile_avatars/user_{self.id}.{ext}"
+            absolute = os.path.join(settings.MEDIA_ROOT, relative.replace("/", os.sep))
+            if os.path.exists(absolute):
+                return relative
+        return ""
+
+    @property
+    def avatar_url(self):
+        relative = self.avatar_relative_path
+        if not relative:
+            return ""
+        absolute = os.path.join(settings.MEDIA_ROOT, relative.replace("/", os.sep))
+        version = int(os.path.getmtime(absolute)) if os.path.exists(absolute) else 0
+        return f"{settings.MEDIA_URL}{relative}?v={version}"
 
 
 class Project(models.Model):
