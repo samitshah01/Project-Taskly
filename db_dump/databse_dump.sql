@@ -116,12 +116,14 @@ CREATE TABLE `users` (
   `id` int NOT NULL AUTO_INCREMENT,
   `first_name` varchar(100),
   `last_name` varchar(100),
-  `email` varchar(150),
-  `password` varchar(255),
+  `username` varchar(50) DEFAULT NULL,
+  `email` varchar(150) NOT NULL,
+  `password` varchar(255) NOT NULL,
   `role` varchar(50) DEFAULT 'user',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `email` (`email`)
+  UNIQUE KEY `email` (`email`),
+  UNIQUE KEY `username` (`username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE `projects` (
@@ -133,21 +135,26 @@ CREATE TABLE `projects` (
   `budget` decimal(12,2) NOT NULL,
   `manager_id` int DEFAULT NULL,
   `status` varchar(20) DEFAULT 'planned',
-  `created_at` datetime DEFAULT NULL,
-  `updated_at` datetime DEFAULT NULL,
+  `color` varchar(20) NOT NULL DEFAULT '#4f7cff',
+  `icon` varchar(50) NOT NULL DEFAULT 'folder2',
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   CONSTRAINT `projects_manager_fk`
   FOREIGN KEY (`manager_id`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE `team_members` (
+CREATE TABLE `project_members` (
   `id` int NOT NULL AUTO_INCREMENT,
+  `project_id` int NOT NULL,
   `user_id` int NOT NULL,
   `role` varchar(100),
-  `joined_at` datetime DEFAULT NULL,
+  `joined_at` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `user_id` (`user_id`),
-  CONSTRAINT `team_members_user_fk`
+  UNIQUE KEY `project_members_unique` (`project_id`,`user_id`),
+  CONSTRAINT `project_members_project_fk`
+  FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `project_members_user_fk`
   FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -160,8 +167,8 @@ CREATE TABLE `tasks` (
   `status` varchar(20) DEFAULT 'todo',
   `priority` varchar(10) DEFAULT 'medium',
   `due_date` date DEFAULT NULL,
-  `created_at` datetime DEFAULT NULL,
-  `updated_at` datetime DEFAULT NULL,
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_tasks_project` (`project_id`),
   CONSTRAINT `tasks_project_fk`
@@ -175,7 +182,7 @@ CREATE TABLE `project_files` (
   `project_id` int NOT NULL,
   `uploaded_by_id` int DEFAULT NULL,
   `file` varchar(255) NOT NULL,
-  `uploaded_at` datetime DEFAULT NULL,
+  `uploaded_at` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   CONSTRAINT `project_files_project_fk`
   FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE,
@@ -188,7 +195,7 @@ CREATE TABLE `expenses` (
   `project_id` int NOT NULL,
   `amount` decimal(10,2) NOT NULL,
   `description` varchar(255) NOT NULL,
-  `created_at` datetime DEFAULT NULL,
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   CONSTRAINT `expenses_project_fk`
   FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE
@@ -199,7 +206,7 @@ CREATE TABLE `task_comments` (
   `task_id` int NOT NULL,
   `user_id` int NOT NULL,
   `comment` text NOT NULL,
-  `created_at` datetime DEFAULT NULL,
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   CONSTRAINT `task_comments_task_fk`
   FOREIGN KEY (`task_id`) REFERENCES `tasks` (`id`) ON DELETE CASCADE,
@@ -213,7 +220,7 @@ CREATE TABLE `activity_logs` (
   `action` varchar(255) NOT NULL,
   `project_id` int DEFAULT NULL,
   `task_id` int DEFAULT NULL,
-  `timestamp` datetime DEFAULT NULL,
+  `timestamp` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   CONSTRAINT `activity_logs_user_fk`
   FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
@@ -221,6 +228,16 @@ CREATE TABLE `activity_logs` (
   FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE,
   CONSTRAINT `activity_logs_task_fk`
   FOREIGN KEY (`task_id`) REFERENCES `tasks` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `password_otps` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `email` varchar(254) NOT NULL,
+  `otp_hash` varchar(128) NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `expires_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `password_otps_email_idx` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 SET FOREIGN_KEY_CHECKS = 1;
