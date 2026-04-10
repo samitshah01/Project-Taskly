@@ -3,6 +3,7 @@ import json
 import os
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError, available_timezones
 from decimal import Decimal, InvalidOperation
+from django.conf import settings
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.utils import timezone
@@ -170,7 +171,7 @@ def get_notifications_last_seen(request):
 
 def build_dashboard_base_context(request, user):
     project_count = Project.objects.count()
-    task_count = Task.objects.count()
+    task_count = Task.objects.filter(assigned_to=user).count()
     task_projects = Project.objects.prefetch_related('project_members__user').order_by('name')
     notifications_last_seen = get_notifications_last_seen(request)
     notification_qs = ActivityLog.objects.select_related('user', 'project', 'task').filter(
@@ -324,8 +325,8 @@ def register(request):
         return redirect('dashboard')
 
     if request.method == 'POST':
-        first_name = request.POST.get('first_name', '').strip()
-        last_name = request.POST.get('last_name', '').strip()
+        first_name = request.POST.get('first_name', '').strip().capitalize()
+        last_name = request.POST.get('last_name', '').strip().capitalize()
         username = request.POST.get('username', '').strip()
         email = request.POST.get('email', '').strip().lower()
         password1 = request.POST.get('password1', '')
@@ -697,6 +698,54 @@ def projects(request):
         'project_icon_options': ['globe', 'server', 'diagram-3', 'people', 'phone', 'bar-chart-line', 'shield-lock', 'lightning-charge', 'brush', 'gear'],
     })
     return render(request, 'dashboard/projects.html', context)
+
+
+def tasks(request):
+    if not request.session.get('user_id'):
+        messages.warning(request, "Please login to continue.")
+        return redirect('login')
+
+    user = get_current_user(request)
+    if not user:
+        messages.error(request, "User not found.")
+        request.session.flush()
+        return redirect('login')
+
+    today_date = timezone.localdate()
+    user_tasks = Task.objects.select_related('project', 'assigned_to').annotate(
+        comment_count=Count('comments')
+    ).filter(assigned_to=user).order_by(
+        Case(
+            When(status=Task.STATUS_COMPLETED, then=1),
+            default=0,
+            output_field=IntegerField(),
+        ),
+        'due_date',
+        '-created_at',
+    )
+
+    task_status_counts = {
+        'total': user_tasks.count(),
+        'todo': user_tasks.filter(status=Task.STATUS_TODO).count(),
+        'in_progress': user_tasks.filter(status=Task.STATUS_IN_PROGRESS).count(),
+        'completed': user_tasks.filter(status=Task.STATUS_COMPLETED).count(),
+        'overdue': user_tasks.exclude(status=Task.STATUS_COMPLETED).filter(due_date__lt=today_date).count(),
+    }
+
+    task_priority_counts = {
+        'high': user_tasks.filter(priority=Task.PRIORITY_HIGH).count(),
+        'medium': user_tasks.filter(priority=Task.PRIORITY_MEDIUM).count(),
+        'low': user_tasks.filter(priority=Task.PRIORITY_LOW).count(),
+    }
+
+    context = build_dashboard_base_context(request, user)
+    context.update({
+        'tasks': user_tasks,
+        'task_status_counts': task_status_counts,
+        'task_priority_counts': task_priority_counts,
+        'today_date': today_date,
+    })
+    return render(request, 'dashboard/tasks.html', context)
 
 
 @require_POST

@@ -1,12 +1,8 @@
 import os
 from django.conf import settings
 from django.db import models
-from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.hashers import make_password, check_password
 from django.utils import timezone
-
-class CustomUser(AbstractUser):
-    pass
 
 
 class Users(models.Model):

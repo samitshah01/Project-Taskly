@@ -16,6 +16,7 @@ urlpatterns = [
     path('register/', views.register, name='register'),
     
     path('dashboard/', views.dashboard, name='dashboard'),
+    path('dashboard/tasks', views.tasks, name='tasks'),
     path('dashboard/tasks/create/', views.create_task, name='create_task'),
     path('dashboard/tasks/<int:task_id>/', views.task_detail, name='task_detail'),
     path('dashboard/tasks/<int:task_id>/update/', views.update_task, name='update_task'),

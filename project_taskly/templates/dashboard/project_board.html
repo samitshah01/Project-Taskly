@@ -16,7 +16,7 @@
                     <i class="bi bi-{{ project.icon }}"></i>
                 </div>
                 <div>
-                    <h4 style="font-family:'Poppins',sans-serif;font-weight:800;font-size:1.25rem;margin-bottom:4px;">{{ project.name }}</h4>
+                    <h4 style="font-weight:800;font-size:1.25rem;margin-bottom:4px;">{{ project.name }}</h4>
                     <p style="color:var(--muted);font-size:13px;margin:0;">{{ project.description|default:"Track project tasks across the board." }}</p>
                 </div>
             </div>
@@ -82,20 +82,6 @@
                             </ul>
                         </div>
                     </div>
-
-                    {% if task.status == 'in_progress' %}
-                    <div class="match-task-progress">
-                        <div class="progress-header">
-                            <span>Progress</span>
-                            <strong>{{ task.progress_value }}%</strong>
-                        </div>
-                        <div class="progress-track">
-                            <div class="progress-fill"
-                                style="width:{{ task.progress_value }}%;background:linear-gradient(90deg,{{ project.color }},var(--accent2));">
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
 
                     <div class="match-task-footer">
                         <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -206,6 +192,24 @@
             <div class="modal-footer">
                 <button type="button" class="btn-ghost" data-bs-dismiss="modal">Close</button>
                 <button type="submit" form="taskEditForm" class="btn-primary-custom">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="deleteTaskModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Delete Task</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p style="margin:0;color:var(--muted);font-size:14px;">Delete <strong id="deleteTaskName"></strong>? This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-ghost" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn-primary-custom" id="confirmDeleteTaskBtn" style="background:var(--high);">Delete</button>
             </div>
         </div>
     </div>

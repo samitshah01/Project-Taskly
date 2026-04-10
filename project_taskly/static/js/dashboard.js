@@ -282,11 +282,29 @@ document.addEventListener("DOMContentLoaded", function () {
     const board = document.querySelector(".kanban-board-match");
     const taskEditModalEl = document.getElementById("taskEditModal");
     const taskEditModal = taskEditModalEl ? new bootstrap.Modal(taskEditModalEl) : null;
+    const deleteTaskModalEl = document.getElementById("deleteTaskModal");
+    const deleteTaskModal = deleteTaskModalEl ? new bootstrap.Modal(deleteTaskModalEl) : null;
     const taskEditForm = document.getElementById("taskEditForm");
     const taskCommentForm = document.getElementById("taskCommentForm");
     const taskCommentsList = document.getElementById("taskCommentsList");
+    const confirmDeleteTaskBtn = document.getElementById("confirmDeleteTaskBtn");
+    const deleteTaskName = document.getElementById("deleteTaskName");
     let draggedTask = null;
     let activeTaskCard = null;
+    let pendingDeleteTask = null;
+
+    async function deleteTaskCard(taskEl) {
+        if (!taskEl) return;
+
+        const payload = await postForm(taskEl.dataset.deleteUrl, {});
+        taskEl.remove();
+        updateColumnCounts();
+        updateBoardSummary();
+        if (taskEditModal) taskEditModal.hide();
+        if (deleteTaskModal) deleteTaskModal.hide();
+        showToast("success", payload.message);
+        pendingDeleteTask = null;
+    }
 
     function updateColumnCounts() {
         if (!board) return;
@@ -324,24 +342,7 @@ document.addEventListener("DOMContentLoaded", function () {
         taskEl.classList.toggle("is-completed", nextStatus === "completed");
 
         const existingProgress = taskEl.querySelector(".match-task-progress");
-        if (nextStatus === "in_progress") {
-            const progressMarkup = `
-                <div class="match-task-progress">
-                    <div class="progress-header">
-                        <span>Progress</span>
-                        <strong>${resolvedProgress}%</strong>
-                    </div>
-                    <div class="progress-track">
-                        <div class="progress-fill" style="width:${resolvedProgress}%;background:linear-gradient(90deg,var(--accent),var(--accent2));"></div>
-                    </div>
-                </div>
-            `;
-            if (existingProgress) {
-                existingProgress.outerHTML = progressMarkup;
-            } else {
-                taskEl.querySelector(".match-task-head").insertAdjacentHTML("afterend", progressMarkup);
-            }
-        } else if (existingProgress) {
+        if (existingProgress) {
             existingProgress.remove();
         }
 
@@ -445,25 +446,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         const existingProgress = taskEl.querySelector(".match-task-progress");
-        if (task.status === "in_progress") {
-            const progressValue = Number(task.progress_value || 0);
-            const progressMarkup = `
-                <div class="match-task-progress">
-                    <div class="progress-header">
-                        <span>Progress</span>
-                        <strong>${progressValue}%</strong>
-                    </div>
-                    <div class="progress-track">
-                        <div class="progress-fill" style="width:${progressValue}%;background:linear-gradient(90deg,var(--accent),var(--accent2));"></div>
-                    </div>
-                </div>
-            `;
-            if (existingProgress) {
-                existingProgress.outerHTML = progressMarkup;
-            } else {
-                taskEl.querySelector(".match-task-head").insertAdjacentHTML("afterend", progressMarkup);
-            }
-        } else if (existingProgress) {
+        if (existingProgress) {
             existingProgress.remove();
         }
     }
@@ -641,17 +624,11 @@ document.addEventListener("DOMContentLoaded", function () {
             }
 
             if (deleteBtn && taskEl) {
-                if (!confirm("Delete this task?")) return;
-                try {
-                    const payload = await postForm(taskEl.dataset.deleteUrl, {});
-                    taskEl.remove();
-                    updateColumnCounts();
-                    updateBoardSummary();
-                    if (taskEditModal) taskEditModal.hide();
-                    showToast("success", payload.message);
-                } catch (error) {
-                    showToast("error", error.message);
+                pendingDeleteTask = taskEl;
+                if (deleteTaskName) {
+                    deleteTaskName.textContent = taskEl.querySelector(".match-task-title")?.textContent?.trim() || "this task";
                 }
+                if (deleteTaskModal) deleteTaskModal.show();
             }
         });
 
@@ -715,6 +692,28 @@ document.addEventListener("DOMContentLoaded", function () {
                     showToast("error", error.message);
                 }
             });
+        });
+    }
+
+    if (confirmDeleteTaskBtn) {
+        confirmDeleteTaskBtn.addEventListener("click", async () => {
+            if (!pendingDeleteTask || confirmDeleteTaskBtn.dataset.loading === "true") return;
+
+            confirmDeleteTaskBtn.dataset.loading = "true";
+            try {
+                await deleteTaskCard(pendingDeleteTask);
+            } catch (error) {
+                showToast("error", error.message);
+            } finally {
+                delete confirmDeleteTaskBtn.dataset.loading;
+            }
+        });
+    }
+
+    if (deleteTaskModalEl) {
+        deleteTaskModalEl.addEventListener("hidden.bs.modal", () => {
+            pendingDeleteTask = null;
+            if (deleteTaskName) deleteTaskName.textContent = "";
         });
     }
 
@@ -952,7 +951,15 @@ document.addEventListener("DOMContentLoaded", function () {
                     headers: { "X-CSRFToken": csrfToken },
                     body: formData
                 });
-                const payload = await response.json();
+                const rawResponse = await response.text();
+                let payload = {};
+
+                try {
+                    payload = rawResponse ? JSON.parse(rawResponse) : {};
+                } catch (parseError) {
+                    throw new Error("Unable to upload photo right now.");
+                }
+
                 if (!response.ok || !payload.success) throw new Error(payload.message || "Unable to upload photo.");
                 syncUserAvatar(payload.user_id, payload.user_initials, payload.avatar_url, "Profile photo");
                 showToast("success", payload.message);

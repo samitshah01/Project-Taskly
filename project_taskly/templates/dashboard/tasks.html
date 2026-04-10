@@ -1,0 +1,141 @@
+{% extends 'components/dashboard_base.html' %}
+
+{% load static %}
+
+{% block title %}My Tasks - Taskly{% endblock %}
+
+{% block dashboard_content %}
+<div class="tasks-page">
+    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
+        <div>
+            <div class="board-breadcrumb">
+                <a href="{% url 'dashboard' %}">Dashboard</a>
+                <span>/</span>
+                <span>My Tasks</span>
+            </div>
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <div class="project-icon-wrap" style="background:rgba(79,124,255,0.12);color:var(--accent);">
+                    <i class="bi bi-check2-circle"></i>
+                </div>
+                <div>
+                    <h4 style="font-weight:800;font-size:1.25rem;margin-bottom:4px;">My Tasks</h4>
+                    <p style="color:var(--muted);font-size:13px;margin:0;">Track your workload, deadlines, and progress across active projects.</p>
+                </div>
+            </div>
+        </div>
+        <button class="btn-primary-custom d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#addTaskModal">
+            <i class="bi bi-plus-lg"></i> New Task
+        </button>
+    </div>
+
+    <div class="projects-stats tasks-stats">
+        <div class="pstat-card">
+            <div class="pstat-icon blue"><i class="bi bi-list-task"></i></div>
+            <div>
+                <div class="pstat-num">{{ task_status_counts.total }}</div>
+                <div class="pstat-label">All Tasks</div>
+            </div>
+        </div>
+        <div class="pstat-card">
+            <div class="pstat-icon yellow"><i class="bi bi-hourglass-split"></i></div>
+            <div>
+                <div class="pstat-num">{{ task_status_counts.todo }}</div>
+                <div class="pstat-label">To Do</div>
+            </div>
+        </div>
+        <div class="pstat-card">
+            <div class="pstat-icon purple"><i class="bi bi-activity"></i></div>
+            <div>
+                <div class="pstat-num">{{ task_status_counts.in_progress }}</div>
+                <div class="pstat-label">In Progress</div>
+            </div>
+        </div>
+        <div class="pstat-card">
+            <div class="pstat-icon green"><i class="bi bi-patch-check"></i></div>
+            <div>
+                <div class="pstat-num">{{ task_status_counts.completed }}</div>
+                <div class="pstat-label">Completed</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
+        <div class="filter-bar">
+            <button class="filter-pill active" data-task-filter="all">All <span class="pill-count">{{ task_status_counts.total }}</span></button>
+            <button class="filter-pill" data-task-filter="todo">To Do <span class="pill-count">{{ task_status_counts.todo }}</span></button>
+            <button class="filter-pill" data-task-filter="in_progress">In Progress <span class="pill-count">{{ task_status_counts.in_progress }}</span></button>
+            <button class="filter-pill" data-task-filter="completed">Completed <span class="pill-count">{{ task_status_counts.completed }}</span></button>
+            <button class="filter-pill" data-task-filter="overdue">Overdue <span class="pill-count">{{ task_status_counts.overdue }}</span></button>
+        </div>
+        <label class="task-search-shell" for="taskSearchInput">
+            <i class="bi bi-search"></i>
+            <input type="search" id="taskSearchInput" class="task-search-input" placeholder="Search tasks, projects, or priorities">
+        </label>
+    </div>
+
+    <div class="tasks-grid" id="tasksGrid">
+        {% for task in tasks %}
+        <article class="task-card-shell fade-in"
+            data-task-card
+            data-status="{{ task.status }}"
+            data-priority="{{ task.priority }}"
+            data-overdue="{% if task.status != 'completed' and task.due_date and task.due_date < today_date %}true{% else %}false{% endif %}"
+            data-search="{{ task.title|lower }} {{ task.project.name|lower }} {{ task.priority|lower }} {{ task.status|lower }}">
+            <a href="{% url 'project_board' task.project_id %}" class="task-card-link">
+                <div class="task-card-top">
+                    <div>
+                        <div class="task-card-title">{{ task.title }}</div>
+                        <div class="task-card-project"><i class="bi bi-folder2-open"></i> {{ task.project.name }}</div>
+                    </div>
+                    <span class="proj-status {{ task.status }}">{{ task.get_status_display }}</span>
+                </div>
+                <div class="task-card-body">
+                    <div class="task-card-meta">
+                        <span class="priority-pill {{ task.priority }}">{{ task.priority|upper }}</span>
+                        <span class="task-card-chip"><i class="bi bi-chat"></i> {{ task.comment_count }}</span>
+                        {% if task.due_date %}
+                        <span class="task-card-chip {% if task.status != 'completed' and task.due_date < today_date %}is-overdue{% endif %}"><i class="bi bi-calendar3"></i> {{ task.due_date|date:"M d, Y" }}</span>
+                        {% else %}
+                        <span class="task-card-chip"><i class="bi bi-calendar3"></i> No deadline</span>
+                        {% endif %}
+                    </div>
+                    <div class="task-card-footer">
+                        <div class="task-card-assignee">
+                            {% if task.assigned_to %}
+                            <div class="proj-ava task-card-avatar" data-avatar-user-id="{{ task.assigned_to.id }}" data-avatar-initials="{{ task.assigned_to.initials }}">{% if task.assigned_to.avatar_url %}<img src="{{ task.assigned_to.avatar_url }}" alt="{{ task.assigned_to.display_name }}" class="avatar-media avatar-media-cover">{% else %}{{ task.assigned_to.initials }}{% endif %}</div>
+                            <div>
+                                <div class="task-card-assignee-name">{{ task.assigned_to.display_name }}</div>
+                                <div class="task-card-assignee-copy">Assigned to you</div>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="task-card-open">
+                            <span>Open board</span>
+                            <i class="bi bi-arrow-up-right"></i>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </article>
+        {% empty %}
+        <div class="empty-state" id="tasksEmptyState" style="display:block;">
+            <div class="empty-icon"><i class="bi bi-check2-circle"></i></div>
+            <div class="empty-title">No tasks assigned</div>
+            <p class="empty-sub">Create a task or assign one to yourself to see it here.</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if tasks %}
+    <div class="empty-state" id="tasksEmptyState" style="display:none;">
+        <div class="empty-icon"><i class="bi bi-search"></i></div>
+        <div class="empty-title">No matching tasks</div>
+        <p class="empty-sub">Try a different filter or search term.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/tasks.js' %}"></script>
+{% endblock %}
