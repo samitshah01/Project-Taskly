@@ -1,4 +1,36 @@
 document.addEventListener("DOMContentLoaded", function () {
+    function applyDynamicStyles(root = document) {
+        root.querySelectorAll("[data-inline-bg]").forEach(node => {
+            const background = node.dataset.inlineBg;
+            if (background) {
+                node.style.background = background;
+            }
+        });
+
+        root.querySelectorAll("[data-inline-color]").forEach(node => {
+            const color = node.dataset.inlineColor;
+            if (color) {
+                node.style.color = color;
+            }
+        });
+
+        root.querySelectorAll("[data-gradient-start]").forEach(node => {
+            const start = node.dataset.gradientStart;
+            const end = node.dataset.gradientEnd || "var(--accent2)";
+            if (start) {
+                node.style.background = `linear-gradient(90deg, ${start}, ${end})`;
+            }
+        });
+
+        root.querySelectorAll("[data-progress-width]").forEach(node => {
+            const progress = Number(node.dataset.progressWidth || 0);
+            const clampedProgress = Math.max(0, Math.min(progress, 100));
+            node.style.width = `${clampedProgress}%`;
+        });
+    }
+
+    applyDynamicStyles();
+
     function renderAvatarContent(avatarUrl, initials, altText = "Avatar") {
         const safeAltText = String(altText || "Avatar").replace(/"/g, "&quot;");
         return avatarUrl
@@ -820,5 +852,20 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         });
     }
+
+    document.querySelectorAll("[data-password-toggle]").forEach(button => {
+        button.addEventListener("click", () => {
+            const fieldWrap = button.closest(".password-field-wrap");
+            const input = fieldWrap?.querySelector(".password-toggle-input");
+            const icon = button.querySelector("i");
+            if (!input || !icon) return;
+
+            const isHidden = input.type === "password";
+            input.type = isHidden ? "text" : "password";
+            icon.className = isHidden ? "bi bi-eye-slash" : "bi bi-eye";
+            button.setAttribute("aria-label", isHidden ? "Hide password" : "Show password");
+            button.setAttribute("aria-pressed", isHidden ? "true" : "false");
+        });
+    });
 
 });

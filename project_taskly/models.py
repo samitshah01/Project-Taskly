@@ -1,11 +1,17 @@
 import os
+from typing import TYPE_CHECKING
 from django.conf import settings
 from django.db import models
 from django.contrib.auth.hashers import make_password, check_password
 from django.utils import timezone
 
-
 class Users(models.Model):
+    if TYPE_CHECKING:
+        tasks: "models.Manager[Task]"
+        project_memberships: "models.Manager[ProjectMember]"
+        managed_projects: "models.Manager[Project]"
+        activity_logs: "models.Manager[ActivityLog]"
+
     id = models.AutoField(primary_key=True)
     first_name = models.CharField(max_length=100, blank=True, null=True)
     last_name = models.CharField(max_length=100, blank=True, null=True)
@@ -65,6 +71,14 @@ class Users(models.Model):
 
 
 class Project(models.Model):
+    if TYPE_CHECKING:
+        manager_id: int | None
+        tasks: "models.Manager[Task]"
+        project_members: "models.Manager[ProjectMember]"
+        files: "models.Manager[ProjectFile]"
+        expenses: "models.Manager[Expense]"
+        activity_logs: "models.Manager[ActivityLog]"
+
     STATUS_PLANNED = 'planned'
     STATUS_IN_PROGRESS = 'in_progress'
     STATUS_COMPLETED = 'completed'
@@ -109,6 +123,10 @@ class Project(models.Model):
 
 
 class ProjectMember(models.Model):
+    if TYPE_CHECKING:
+        user_id: int
+        project_id: int
+
     id = models.AutoField(primary_key=True)
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='project_members')
     user = models.ForeignKey(Users, on_delete=models.CASCADE, related_name='project_memberships')
@@ -132,6 +150,16 @@ class ProjectMember(models.Model):
 
 
 class Task(models.Model):
+    if TYPE_CHECKING:
+        project_id: int
+        assigned_to_id: int | None
+        comments: "models.Manager[TaskComment]"
+        activity_logs: "models.Manager[ActivityLog]"
+
+        def get_status_display(self) -> str: ...
+
+        def get_priority_display(self) -> str: ...
+
     STATUS_TODO = 'todo'
     STATUS_IN_PROGRESS = 'in_progress'
     STATUS_COMPLETED = 'completed'

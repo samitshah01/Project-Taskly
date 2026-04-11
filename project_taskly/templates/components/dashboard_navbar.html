@@ -1,10 +1,10 @@
 {% load static %}
 
 <aside class="sidebar" id="sidebar">
-    <div class="sidebar-logo">
-        <div class="logo-icon"><img src="{% static 'images/logo/logo.png' %}" alt="Taskly Logo" style="height: 32px;"></div>
-        Taskly
-    </div>
+    <a href="{% url 'index' %}" class="sidebar-logo" aria-label="Go to Taskly homepage">
+        <span class="logo-icon"><img src="{% static 'images/logo/logo.png' %}" alt="Taskly Logo"></span>
+        <span class="sidebar-logo-text">Taskly</span>
+    </a>
 
     <div class="sidebar-section">
         <div class="sidebar-label">Main Menu</div>

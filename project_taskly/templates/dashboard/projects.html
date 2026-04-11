@@ -74,13 +74,11 @@
         <article class="project-card project-card-shell" data-status="{{ item.object.status }}"
             data-name="{{ item.object.name|lower }}">
             <a href="{% url 'project_board' item.object.id %}" class="project-card-link">
-                <div class="project-card-strip"
-                    style="background:linear-gradient(90deg,{{ item.object.color }},var(--accent2));"></div>
+                <div class="project-card-strip" data-gradient-start="{{ item.object.color }}"></div>
                 <div class="project-card-body">
                     <div class="project-card-top">
                         <div class="d-flex gap-3 align-items-start">
-                            <div class="project-icon-wrap"
-                                style="background:rgba(79,124,255,0.12);color:var(--accent);">
+                            <div class="project-icon-wrap" style="background:rgba(79,124,255,0.12);color:var(--accent);">
                                 <i class="bi bi-{{ item.object.icon }}"></i>
                             </div>
                             <div>
@@ -129,8 +127,8 @@
                             <strong>{{ item.progress }}%</strong>
                         </div>
                         <div class="progress-track">
-                            <div class="progress-fill"
-                                style="width:{{ item.progress }}%;background:linear-gradient(90deg,{{ item.object.color }},var(--accent2));">
+                            <div class="progress-fill" data-progress-width="{{ item.progress }}"
+                                data-gradient-start="{{ item.object.color }}">
                             </div>
                         </div>
                     </div>
@@ -230,7 +228,7 @@
                                 <div class="color-picker" id="colorPicker">
                                     {% for color in project_color_options %}
                                     <button type="button" class="color-swatch {% if forloop.first %}selected{% endif %}"
-                                        style="background:{{ color }};" data-color="{{ color }}"
+                                        data-inline-bg="{{ color }}" data-color="{{ color }}"
                                         aria-label="Choose color {{ color }}"></button>
                                     {% endfor %}
                                 </div>
@@ -345,7 +343,7 @@
                                 <label class="form-label">Project Colour</label>
                                 <div class="color-picker" id="editColorPicker">
                                     {% for color in project_color_options %}
-                                    <button type="button" class="color-swatch" style="background:{{ color }};"
+                                    <button type="button" class="color-swatch" data-inline-bg="{{ color }}"
                                         data-color="{{ color }}" aria-label="Choose color {{ color }}"></button>
                                     {% endfor %}
                                 </div>
