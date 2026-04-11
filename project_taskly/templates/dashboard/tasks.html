@@ -23,7 +23,7 @@
                 </div>
             </div>
         </div>
-        <button class="btn-primary-custom d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#addTaskModal">
+        <button class="btn-primary-custom d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#addTaskModal" {% if not task_project_options %}disabled{% endif %}>
             <i class="bi bi-plus-lg"></i> New Task
         </button>
     </div>

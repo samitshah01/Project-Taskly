@@ -88,6 +88,7 @@
                                 <div class="project-desc">{{ item.object.description|default:"No description added yet." }}</div>
                             </div>
                         </div>
+                        {% if item.can_manage %}
                         <div class="dropdown project-card-menu">
                             <button type="button" class="proj-menu-btn" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="bi bi-three-dots-vertical"></i>
@@ -107,7 +108,8 @@
                                 <li><button type="button" class="dropdown-item project-team-trigger"
                                         data-project-id="{{ item.object.id }}"
                                         data-project-name="{{ item.object.name }}"
-                                        data-project-members="{% for member in item.object.project_members.all %}{{ member.user.id }}{% if not forloop.last %},{% endif %}{% endfor %}"><i
+                                        data-project-members="{% for member in item.object.project_members.all %}{{ member.user.id }}{% if not forloop.last %},{% endif %}{% endfor %}"
+                                        data-project-roles="{% for member in item.object.project_members.all %}{{ member.user.id }}:{{ member.display_role }}{% if not forloop.last %}|{% endif %}{% endfor %}"><i
                                             class="bi bi-people"></i> Manage Team</button></li>
                                 <li>
                                     <hr class="dropdown-divider">
@@ -118,6 +120,7 @@
                                         Project</button></li>
                             </ul>
                         </div>
+                        {% endif %}
                     </div>
                     <span class="proj-status {{ item.object.status }}">{{ item.object.status_label }}</span>
                     <div class="project-progress">
@@ -137,9 +140,15 @@
                     </div>
                 </div>
                 <div class="project-card-footer">
-                    <div class="proj-team">
+                    <div class="proj-team member-stack">
                         {% for member in item.members %}
-                        <div class="proj-ava" style="background:var(--accent);" data-avatar-user-id="{{ member.user.id }}" data-avatar-initials="{{ member.user.initials }}">{% if member.user.avatar_url %}<img src="{{ member.user.avatar_url }}" alt="{{ member.user.display_name }}" class="avatar-media avatar-media-cover">{% else %}{{ member.user.initials }}{% endif %}</div>
+                        <div class="member-avatar-shell">
+                            <div class="proj-ava" style="background:var(--accent);" data-avatar-user-id="{{ member.user.id }}" data-avatar-initials="{{ member.user.initials }}">{% if member.user.avatar_url %}<img src="{{ member.user.avatar_url }}" alt="{{ member.user.display_name }}" class="avatar-media avatar-media-cover">{% else %}{{ member.user.initials }}{% endif %}</div>
+                            <div class="member-hover-card">
+                                <div class="member-hover-name">{{ member.user.display_name }}</div>
+                                <div class="member-hover-role">{{ member.role }}</div>
+                            </div>
+                        </div>
                         {% endfor %}
                         {% if item.extra_members %}
                         <div class="proj-ava-more">+{{ item.extra_members }}</div>
@@ -254,12 +263,16 @@
                                                 {% endif %}
                                             </span>
                                         </span>
-                                        <input type="checkbox" name="members" value="{{ member.id }}"
-                                            id="create-member-{{ member.id }}" class="manage-team-check" />
+                                        <span class="d-flex align-items-center gap-2">
+                                            <input type="text" class="form-control form-control-sm manage-role-input"
+                                                name="role_{{ member.id }}" placeholder="Role">
+                                            <input type="checkbox" name="members" value="{{ member.id }}"
+                                                id="create-member-{{ member.id }}" class="manage-team-check" />
+                                        </span>
                                     </label>
                                     {% endfor %}
                                 </div>
-                                <div class="manage-team-note">Choose the teammates who should be added to this project.
+                                <div class="manage-team-note">Choose the teammates who should be added to this project and assign a role like Developer, Designer, or QA Tester.
                                 </div>
                             </div>
                         </div>
@@ -384,12 +397,16 @@
                                     {% endif %}
                                 </span>
                             </span>
-                            <input type="checkbox" name="members" value="{{ member.id }}"
-                                id="manage-member-{{ member.id }}" class="manage-team-check" />
+                            <span class="d-flex align-items-center gap-2">
+                                <input type="text" class="form-control form-control-sm manage-role-input"
+                                    name="role_{{ member.id }}" id="manage-role-{{ member.id }}" placeholder="Role">
+                                <input type="checkbox" name="members" value="{{ member.id }}"
+                                    id="manage-member-{{ member.id }}" class="manage-team-check" />
+                            </span>
                         </label>
                         {% endfor %}
                     </div>
-                    <div class="manage-team-note">Select the teammates who should have access to this project.</div>
+                    <div class="manage-team-note">Select the teammates who should have access to this project and set their project-specific role.</div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn-ghost" data-bs-dismiss="modal">Cancel</button>

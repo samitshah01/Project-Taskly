@@ -129,21 +129,31 @@
             {% for row in project_rows %}
             <div class="project-row">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-                <div class="project-name">{{ row.object.name }}</div>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                  <div class="project-name">{{ row.object.name }}</div>
+                  {% if row.current_membership %}
+                  <span class="badge {% if row.current_membership.is_manager %}bg-primary{% else %}bg-secondary{% endif %}">
+                    {{ row.current_membership.display_role }}
+                  </span>
+                  {% endif %}
+                </div>
                 <span style="font-size:11px;color:var(--muted);">{{ row.task_total }} tasks</span>
               </div>
               <div class="project-meta">
-                <span>
-                  <i class="bi bi-people" style="margin-right:3px;"></i>
-                  {% if row.member_initials %}
-                  {{ row.member_initials|join:", " }}
-                  {% if row.member_extra_count %}+{{ row.member_extra_count }}{% endif %}
-                  {% else %}
-                  No members
-                  {% endif %}
-                </span>
+                <span><i class="bi bi-people" style="margin-right:3px;"></i>{{ row.members|length }} members</span>
                 <span><i class="bi bi-calendar3" style="margin-right:3px;"></i>{% if row.object.end_date %}Due {{ row.object.end_date|date:"M j" }}{% else %}No deadline{% endif %}</span>
                 <span style="margin-left:auto;font-weight:700;color:{{ row.status_color }};">{{ row.progress }}%</span>
+              </div>
+              <div class="member-stack member-stack-inline" style="margin-top:10px;">
+                {% for member in row.members %}
+                <div class="member-avatar-shell">
+                  <div class="proj-ava" style="background:var(--accent);" data-avatar-user-id="{{ member.user.id }}" data-avatar-initials="{{ member.user.initials }}">{% if member.user.avatar_url %}<img src="{{ member.user.avatar_url }}" alt="{{ member.user.display_name }}" class="avatar-media avatar-media-cover">{% else %}{{ member.user.initials }}{% endif %}</div>
+                  <div class="member-hover-card">
+                    <div class="member-hover-name">{{ member.user.display_name }}</div>
+                    <div class="member-hover-role">{{ member.role }}</div>
+                  </div>
+                </div>
+                {% endfor %}
               </div>
               <div class="progress-track">
                 <div class="progress-fill"
@@ -226,12 +236,18 @@
           <div style="margin-top:14px;">
             {% for member in team_members %}
             <div class="team-member">
-              <div class="act-ava" style="background:var(--accent);width:34px;height:34px;font-size:12px;" data-avatar-user-id="{{ member.id }}" data-avatar-initials="{{ member.initials }}">{% if member.avatar_url %}<img src="{{ member.avatar_url }}" alt="{{ member.display_name }}" class="avatar-media avatar-media-cover">{% else %}{{ member.initials }}{% endif %}</div>
-              <div>
-                <div class="member-name">{{ member.display_name }}</div>
-                <div class="member-role">{{ member.role|default:"Team Member" }}</div>
+              <div class="member-avatar-shell">
+                <div class="act-ava team-member-avatar" style="background:var(--accent);" data-avatar-user-id="{{ member.user.id }}" data-avatar-initials="{{ member.user.initials }}">{% if member.user.avatar_url %}<img src="{{ member.user.avatar_url }}" alt="{{ member.user.display_name }}" class="avatar-media avatar-media-cover">{% else %}{{ member.user.initials }}{% endif %}</div>
+                <div class="member-hover-card">
+                  <div class="member-hover-name">{{ member.user.display_name }}</div>
+                  <div class="member-hover-role">{{ member.role }}</div>
+                </div>
               </div>
-              <div class="online-dot" style="background:var(--low);" title="Active"></div>
+              <div style="min-width:0;">
+                <div class="member-name">{{ member.user.display_name }}</div>
+                <div class="member-role">{{ member.project.name }}</div>
+              </div>
+              <span class="badge {{ member.badge_class }}">{{ member.role }}</span>
             </div>
             {% empty %}
             <p style="margin:0;color:var(--muted);font-size:13px;">No team members found.</p>
@@ -239,6 +255,7 @@
           </div>
         </div>
       </div>
+
     </div>
   </div>
 </div>

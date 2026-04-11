@@ -56,7 +56,7 @@ document.addEventListener("DOMContentLoaded", function () {
             members.forEach(member => {
                 const option = document.createElement("option");
                 option.value = member.id;
-                option.textContent = member.name;
+                option.textContent = member.role ? `${member.name} (${member.role})` : member.name;
                 assigneeSelect.appendChild(option);
             });
         };
@@ -188,7 +188,7 @@ document.addEventListener("DOMContentLoaded", function () {
             const query = createTeamSearch.value.trim().toLowerCase();
             createTeamOptions.forEach(option => {
                 const haystack = option.dataset.memberSearch || "";
-                option.style.display = query && haystack.includes(query) ? "" : "none";
+                option.style.display = !query || haystack.includes(query) ? "" : "none";
             });
         };
 
@@ -255,10 +255,22 @@ document.addEventListener("DOMContentLoaded", function () {
             const manageTeamProjectName = document.getElementById("manageTeamProjectName");
             if (!manageTeamForm || !manageTeamProjectName) return;
             const selectedMembers = button.dataset.projectMembers ? button.dataset.projectMembers.split(",") : [];
+            const selectedRoles = {};
+            (button.dataset.projectRoles || "").split("|").forEach(entry => {
+                const dividerIndex = entry.indexOf(":");
+                if (dividerIndex === -1) return;
+                const userId = entry.slice(0, dividerIndex);
+                const role = entry.slice(dividerIndex + 1);
+                if (userId) selectedRoles[userId] = role;
+            });
             manageTeamForm.action = `/dashboard/projects/${button.dataset.projectId}/team/`;
             manageTeamProjectName.textContent = `Update team members for ${button.dataset.projectName}.`;
             document.querySelectorAll("#manageTeamMembers .manage-team-check").forEach(option => {
                 option.checked = selectedMembers.includes(option.value);
+            });
+            document.querySelectorAll("#manageTeamMembers .manage-role-input").forEach(input => {
+                const userId = input.name.replace("role_", "");
+                input.value = selectedRoles[userId] || "";
             });
             if (manageTeamModal) manageTeamModal.show();
         });
@@ -769,184 +781,19 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    // Profile Page
-    function getTimezonePresentation(timezoneValue, fallbackLabel = "") {
-        try {
-            const now = new Date();
-            return {
-                label: fallbackLabel || timezoneValue,
-                date: new Intl.DateTimeFormat("en-US", {
-                    timeZone: timezoneValue,
-                    weekday: "long",
-                    year: "numeric",
-                    month: "long",
-                    day: "2-digit"
-                }).format(now),
-                time: new Intl.DateTimeFormat("en-US", {
-                    timeZone: timezoneValue,
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    second: "2-digit",
-                    hour12: true
-                }).format(now)
-            };
-        } catch (error) {
-            return {
-                label: fallbackLabel || timezoneValue,
-                date: "",
-                time: ""
-            };
-        }
-    }
-
-    const saveProfileBtn = document.getElementById("saveProfileBtn");
-    if (saveProfileBtn) {
-        saveProfileBtn.addEventListener("click", function () {
-            const editName = document.getElementById("editName");
-            const editRole = document.getElementById("editRole");
-            const editEmail = document.getElementById("editEmail");
-            const editBio = document.getElementById("editBio");
-            const editTeam = document.getElementById("editTeam");
-            const editLocation = document.getElementById("editLocation");
-            const editTimezone = document.getElementById("editTimezone");
-            const editSkills = document.getElementById("editSkills");
-
-            if (!editName || !editRole || !editEmail || !editBio || !editTeam || !editLocation || !editTimezone || !editSkills) {
-                console.warn("Edit profile form elements missing");
-                return;
-            }
-
-            const name = editName.value;
-            const role = editRole.value;
-            const email = editEmail.value;
-            const bio = editBio.value;
-            const team = editTeam.value;
-            const timezoneValue = editTimezone.value;
-            const timezoneLabel = editTimezone.options[editTimezone.selectedIndex]?.textContent || timezoneValue;
-            const skills = editSkills.value.split(",").map(s => s.trim()).filter(s => s);
-            const timezonePresentation = getTimezonePresentation(timezoneValue, timezoneLabel);
-
-            const displayName = document.getElementById("displayName");
-            if (displayName) displayName.textContent = name;
-            const displayRole = document.getElementById("displayRole");
-            if (displayRole) displayRole.innerHTML = `<i class="bi bi-shield-check"></i> ${role}`;
-            const displayEmail = document.getElementById("displayEmail");
-            if (displayEmail) displayEmail.textContent = email;
-            const displayBio = document.getElementById("displayBio");
-            if (displayBio) displayBio.textContent = bio;
-            const displayTeam = document.getElementById("displayTeam");
-            if (displayTeam) displayTeam.textContent = team;
-            const displayLocation = document.getElementById("displayLocation");
-            if (displayLocation) displayLocation.textContent = editLocation.value;
-            const displayTimezone = document.getElementById("displayTimezone");
-            if (displayTimezone) {
-                displayTimezone.textContent = timezonePresentation.label;
-                displayTimezone.dataset.timezoneValue = timezoneValue;
-            }
-            const displayLocalDate = document.getElementById("displayLocalDate");
-            if (displayLocalDate) displayLocalDate.textContent = timezonePresentation.date;
-            const displayLocalTime = document.getElementById("displayLocalTime");
-            if (displayLocalTime) displayLocalTime.textContent = timezonePresentation.time;
-
-            const avatarDisplay = document.getElementById("avatarDisplay");
-            const nextInitials = name ? name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) : "";
-            if (avatarDisplay?.dataset?.avatarUserId) {
-                const currentAvatarUrl = avatarDisplay.querySelector("img")?.getAttribute("src") || "";
-                syncUserAvatar(avatarDisplay.dataset.avatarUserId, nextInitials, currentAvatarUrl, name || "Avatar");
-            }
-
-            const skillsContainer = document.getElementById("skillsContainer");
-            if (skillsContainer) {
-                skillsContainer.innerHTML = "";
-                const skillIcons = {
-                    Django: "bi-braces",
-                    Python: "bi-code-slash",
-                    MariaDB: "bi-database",
-                    PostgreSQL: "bi-hdd-network",
-                    "Node.js": "bi-node-plus",
-                    React: "bi-browser-chrome",
-                    Vue: "bi-browser-chrome",
-                    Angular: "bi-browser-chrome",
-                    default: "bi-tag"
-                };
-
-                skills.forEach(skill => {
-                    const icon = skillIcons[skill] || skillIcons.default;
-                    const skillTag = document.createElement("span");
-                    skillTag.className = "skill-tag";
-                    skillTag.innerHTML = `<i class="${icon}"></i> ${skill}`;
-                    skillsContainer.appendChild(skillTag);
-                });
-            }
-
-            const editModal = document.getElementById("editProfileModal");
-            if (editModal) {
-                const modal = bootstrap.Modal.getInstance(editModal);
-                if (modal) modal.hide();
-            }
-
-            fetch(setTimezoneUrl, {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
-                body: JSON.stringify({ timezone: timezoneValue })
-            }).catch(() => {});
-
-            showToast("success", "Profile updated successfully!");
-        });
-    }
-
-    const editProfileModal = document.getElementById("editProfileModal");
-    if (editProfileModal) {
-        editProfileModal.addEventListener("show.bs.modal", function () {
-            const displayName = document.getElementById("displayName");
-            const displayRole = document.getElementById("displayRole");
-            const displayEmail = document.getElementById("displayEmail");
-            const displayBio = document.getElementById("displayBio");
-            const displayTeam = document.getElementById("displayTeam");
-            const displayLocation = document.getElementById("displayLocation");
-            const displayTimezone = document.getElementById("displayTimezone");
-
-            const editName = document.getElementById("editName");
-            const editRole = document.getElementById("editRole");
-            const editEmail = document.getElementById("editEmail");
-            const editBio = document.getElementById("editBio");
-            const editTeam = document.getElementById("editTeam");
-            const editLocation = document.getElementById("editLocation");
-            const editTimezone = document.getElementById("editTimezone");
-            const editSkills = document.getElementById("editSkills");
-
-            if (editName && displayName) editName.value = displayName.textContent;
-            if (editRole && displayRole) {
-                let roleText = displayRole.textContent;
-                roleText = roleText.replace("âœ“", "").replace("bi-shield-check", "").trim();
-                editRole.value = roleText;
-            }
-            if (editEmail && displayEmail) editEmail.value = displayEmail.textContent;
-            if (editBio && displayBio) editBio.value = displayBio.textContent;
-            if (editTeam && displayTeam) editTeam.value = displayTeam.textContent;
-            if (editLocation && displayLocation) editLocation.value = displayLocation.textContent;
-            if (editTimezone && displayTimezone) editTimezone.value = displayTimezone.dataset.timezoneValue || editTimezone.value;
-
-            const skillsContainer = document.getElementById("skillsContainer");
-            if (editSkills && skillsContainer) {
-                editSkills.value = Array.from(skillsContainer.querySelectorAll(".skill-tag")).map(tag => tag.textContent.trim()).join(", ");
-            }
-        });
-    }
-
-    const profileAvatarTrigger = document.getElementById("profileAvatarTrigger");
-    const profileAvatarInput = document.getElementById("profileAvatarInput");
-    if (profileAvatarTrigger && profileAvatarInput && typeof uploadProfileAvatarUrl !== "undefined") {
-        profileAvatarTrigger.addEventListener("click", () => profileAvatarInput.click());
-        profileAvatarInput.addEventListener("change", async () => {
-            const file = profileAvatarInput.files?.[0];
+    const settingsAvatarTrigger = document.getElementById("settingsAvatarTrigger");
+    const settingsAvatarInput = document.getElementById("settingsAvatarInput");
+    if (settingsAvatarTrigger && settingsAvatarInput && typeof uploadSettingsAvatarUrl !== "undefined") {
+        settingsAvatarTrigger.addEventListener("click", () => settingsAvatarInput.click());
+        settingsAvatarInput.addEventListener("change", async () => {
+            const file = settingsAvatarInput.files?.[0];
             if (!file) return;
 
             const formData = new FormData();
             formData.append("avatar", file);
 
             try {
-                const response = await fetch(uploadProfileAvatarUrl, {
+                const response = await fetch(uploadSettingsAvatarUrl, {
                     method: "POST",
                     headers: { "X-CSRFToken": csrfToken },
                     body: formData
@@ -960,14 +807,18 @@ document.addEventListener("DOMContentLoaded", function () {
                     throw new Error("Unable to upload photo right now.");
                 }
 
-                if (!response.ok || !payload.success) throw new Error(payload.message || "Unable to upload photo.");
-                syncUserAvatar(payload.user_id, payload.user_initials, payload.avatar_url, "Profile photo");
+                if (!response.ok || !payload.success) {
+                    throw new Error(payload.message || "Unable to upload photo.");
+                }
+
+                syncUserAvatar(payload.user_id, payload.user_initials, payload.avatar_url, "Account photo");
                 showToast("success", payload.message);
             } catch (error) {
                 showToast("error", error.message);
             } finally {
-                profileAvatarInput.value = "";
+                settingsAvatarInput.value = "";
             }
         });
     }
+
 });

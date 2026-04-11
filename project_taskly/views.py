@@ -79,6 +79,87 @@ def build_project_summary(project):
     }
 
 
+def get_project_membership(project, user):
+    if not user or not project:
+        return None
+    membership = project.project_members.filter(user=user).first()
+    if membership:
+        return membership
+    if project.manager_id and project.manager_id == user.id:
+        return sync_project_manager_membership(project, user)
+    return None
+
+
+def is_project_manager(project, user):
+    membership = get_project_membership(project, user)
+    if membership and membership.is_manager:
+        return True
+    return bool(project.manager_id and user and project.manager_id == user.id)
+
+
+def is_project_member(project, user):
+    return get_project_membership(project, user) is not None
+
+
+def get_accessible_projects(user):
+    if not user:
+        return Project.objects.none()
+    return Project.objects.select_related('manager').prefetch_related('tasks', 'project_members__user').filter(
+        Q(project_members__user=user) | Q(manager=user)
+    ).distinct()
+
+
+def sync_project_manager_membership(project, manager_user, role_label='Project Manager'):
+    membership, _ = ProjectMember.objects.get_or_create(
+        project=project,
+        user=manager_user,
+        defaults={'role': role_label, 'is_manager': True},
+    )
+    updates = []
+    if membership.role != role_label:
+        membership.role = role_label
+        updates.append('role')
+    if not membership.is_manager:
+        membership.is_manager = True
+        updates.append('is_manager')
+    if updates:
+        membership.save(update_fields=updates)
+    return membership
+
+
+def build_role_badge_class(role_name, is_manager=False):
+    if is_manager:
+        return 'bg-primary'
+
+    normalized_role = (role_name or '').strip().lower()
+    if 'developer' in normalized_role:
+        return 'bg-success'
+    if 'designer' in normalized_role:
+        return 'bg-info text-dark'
+    if 'qa' in normalized_role or 'tester' in normalized_role:
+        return 'bg-warning text-dark'
+    return 'bg-secondary'
+
+
+def normalize_membership_role(role_name, is_manager=False):
+    cleaned_role = (role_name or '').strip()
+    if is_manager:
+        return cleaned_role or 'Project Manager'
+    return cleaned_role or 'Team Member'
+
+
+def build_member_entry(membership, current_user_id=None):
+    display_role = membership.display_role
+    return {
+        'membership_id': membership.id,
+        'user': membership.user,
+        'role': display_role,
+        'badge_class': build_role_badge_class(display_role, membership.is_manager),
+        'is_manager': membership.is_manager,
+        'is_current_user': membership.user_id == current_user_id,
+    }
+
+
 def get_task_progress(task):
     if task.status == Task.STATUS_COMPLETED:
         return 100
@@ -111,6 +192,8 @@ def build_task_payload(task):
             'id': membership.user.id,
             'name': membership.user.display_name,
             'initials': membership.user.initials,
+            'role': membership.display_role,
+            'is_manager': membership.is_manager,
         }
         for membership in task.project.project_members.select_related('user').all()
     ]
@@ -170,9 +253,10 @@ def get_notifications_last_seen(request):
 
 
 def build_dashboard_base_context(request, user):
-    project_count = Project.objects.count()
+    accessible_projects = list(get_accessible_projects(user))
+    project_count = len(accessible_projects)
     task_count = Task.objects.filter(assigned_to=user).count()
-    task_projects = Project.objects.prefetch_related('project_members__user').order_by('name')
+    task_projects = [project for project in accessible_projects if is_project_manager(project, user)]
     notifications_last_seen = get_notifications_last_seen(request)
     notification_qs = ActivityLog.objects.select_related('user', 'project', 'task').filter(
         Q(user=user) | Q(project__project_members__user=user)
@@ -188,9 +272,9 @@ def build_dashboard_base_context(request, user):
             {
                 'id': member.user.id,
                 'name': member.user.display_name,
+                'role': member.display_role,
             }
             for member in project.project_members.all()
-            if member.user_id != user.id
         ]
 
     recent_notifications = [
@@ -217,6 +301,7 @@ def build_dashboard_base_context(request, user):
         'user_avatar_url': user.avatar_url,
         'task_project_options': task_projects,
         'task_project_member_map': task_project_member_map,
+        'managed_project_ids': [project.id for project in task_projects],
     }
 
 @require_POST
@@ -250,15 +335,6 @@ def mark_notifications_read(request):
 
 def index(request):
     return render(request, 'index.html')
-
-
-def terms(request):
-    return render(request, 'pages/terms.html')
-
-
-def privacy(request):
-    return render(request, 'pages/privacy.html')
-
 
 @csrf_protect
 def login(request):
@@ -541,20 +617,25 @@ def dashboard(request):
     )[:6])
 
     project_rows = []
-    projects = Project.objects.prefetch_related('tasks', 'project_members__user').all()[:4]
+    projects = list(get_accessible_projects(user)[:4])
     for project in projects:
+        membership = get_project_membership(project, user)
         project_tasks = list(project.tasks.all())
         task_total = len(project_tasks)
         completed_total = sum(1 for task in project_tasks if task.status == Task.STATUS_COMPLETED)
         progress = round((completed_total / task_total) * 100) if task_total else 0
-        member_initials = [member.user.initials for member in project.project_members.all()[:3]]
+        member_entries = [
+            build_member_entry(member, current_user_id=user.id)
+            for member in project.project_members.select_related('user').all()
+        ]
         project_rows.append({
             'object': project,
             'task_total': task_total,
             'progress': progress,
-            'member_initials': member_initials,
-            'member_extra_count': max(project.project_members.count() - len(member_initials), 0),
+            'members': member_entries,
             'status_color': get_status_badge_color(project.status),
+            'current_membership': membership,
+            'is_manager': bool(membership and membership.is_manager),
         })
 
     upcoming_deadlines = list(
@@ -563,13 +644,26 @@ def dashboard(request):
         .order_by('due_date')[:4]
     )
     recent_activity = list(
-        ActivityLog.objects.select_related('user', 'project', 'task').order_by('-timestamp')[:4]
+        ActivityLog.objects.select_related('user', 'project', 'task').filter(
+            Q(user=user) | Q(project__project_members__user=user)
+        ).distinct().order_by('-timestamp')[:4]
     )
-    team_members = list(
-        Users.objects.filter(
-            Q(id=user.id) | Q(project_memberships__project__project_members__user=user)
-        ).distinct()[:5]
-    )
+    team_members = []
+    seen_memberships = set()
+    for project in projects:
+        for member in project.project_members.select_related('user').all():
+            key = (member.project_id, member.user_id)
+            if key in seen_memberships:
+                continue
+            seen_memberships.add(key)
+            team_members.append({
+                'project': project,
+                **build_member_entry(member, current_user_id=user.id),
+            })
+            if len(team_members) >= 6:
+                break
+        if len(team_members) >= 6:
+            break
 
     context = build_dashboard_base_context(request, user)
     context.update({
@@ -620,6 +714,9 @@ def create_task(request):
     project = Project.objects.filter(id=project_id).first()
     if not project:
         messages.error(request, 'Please select a valid project.')
+        return redirect(next_url)
+    if not is_project_manager(project, user):
+        messages.error(request, 'Only the project manager can create tasks for this project.')
         return redirect(next_url)
 
     valid_priorities = {choice[0] for choice in Task.PRIORITY_CHOICES}
@@ -676,8 +773,20 @@ def projects(request):
         request.session.flush()
         return redirect('login')
 
-    projects_qs = Project.objects.select_related('manager').prefetch_related('tasks', 'project_members__user').all()
-    project_cards = [build_project_summary(project) for project in projects_qs]
+    projects_qs = get_accessible_projects(user)
+    project_cards = []
+    for project in projects_qs:
+        summary = build_project_summary(project)
+        membership = get_project_membership(project, user)
+        summary.update({
+            'current_membership': membership,
+            'can_manage': is_project_manager(project, user),
+            'member_entries': [
+                build_member_entry(member, current_user_id=user.id)
+                for member in project.project_members.select_related('user').all()
+            ],
+        })
+        project_cards.append(summary)
 
     total_budget = projects_qs.aggregate(total=Sum('budget'))['total'] or 0
     status_counts = projects_qs.aggregate(
@@ -765,6 +874,9 @@ def update_project(request, project_id):
     if not project:
         messages.error(request, 'Project not found.')
         return redirect('projects')
+    if not is_project_manager(project, user):
+        messages.error(request, 'Only the project manager can update this project.')
+        return redirect('projects')
 
     name = request.POST.get('name', '').strip()
     description = request.POST.get('description', '').strip()
@@ -835,9 +947,18 @@ def manage_project_team(request, project_id):
     if not project:
         messages.error(request, 'Project not found.')
         return redirect('projects')
+    if not is_project_manager(project, user):
+        messages.error(request, 'Only the project manager can manage team members.')
+        return redirect('projects')
 
     selected_member_ids = {int(member_id) for member_id in request.POST.getlist('members') if member_id.isdigit()}
     selected_member_ids.add(project.manager_id or user.id)
+    role_map = {}
+    for member_id in selected_member_ids:
+        role_map[member_id] = normalize_membership_role(
+            request.POST.get(f'role_{member_id}', ''),
+            is_manager=member_id == (project.manager_id or user.id),
+        )
 
     current_members = {membership.user_id: membership for membership in project.project_members.all()}
 
@@ -847,15 +968,21 @@ def manage_project_team(request, project_id):
 
     valid_users = Users.objects.filter(id__in=selected_member_ids)
     for member in valid_users:
+        is_manager_member = member.id == project.manager_id
         if member.id not in current_members:
             ProjectMember.objects.create(
                 project=project,
                 user=member,
-                role='Manager' if member.id == project.manager_id else 'Member',
+                role=role_map.get(member.id, 'Project Manager' if is_manager_member else 'Team Member'),
+                is_manager=is_manager_member,
             )
-        elif member.id == project.manager_id and current_members[member.id].role != 'Manager':
-            current_members[member.id].role = 'Manager'
-            current_members[member.id].save(update_fields=['role'])
+        else:
+            membership = current_members[member.id]
+            membership.role = role_map.get(member.id, membership.role)
+            membership.is_manager = is_manager_member
+            membership.save(update_fields=['role', 'is_manager'])
+
+    sync_project_manager_membership(project, user if project.manager_id is None else project.manager)
 
     ActivityLog.objects.create(
         user=user,
@@ -882,6 +1009,9 @@ def delete_project(request, project_id):
     project = Project.objects.filter(id=project_id).first()
     if not project:
         messages.error(request, 'Project not found.')
+        return redirect('projects')
+    if not is_project_manager(project, user):
+        messages.error(request, 'Only the project manager can delete this project.')
         return redirect('projects')
 
     project_name = project.name
@@ -912,6 +1042,9 @@ def project_board(request, project_id):
     if not project:
         messages.error(request, 'Project not found.')
         return redirect('projects')
+    if not is_project_member(project, user):
+        messages.error(request, 'You do not have access to this project.')
+        return redirect('projects')
 
     summary = build_project_summary(project)
     task_columns = {
@@ -932,6 +1065,12 @@ def project_board(request, project_id):
     context.update({
         'project': project,
         'project_summary': summary,
+        'project_memberships': [
+            build_member_entry(member, current_user_id=user.id)
+            for member in project.project_members.select_related('user').all()
+        ],
+        'current_project_membership': get_project_membership(project, user),
+        'can_manage_project': is_project_manager(project, user),
         'board_columns': [
             {'key': Task.STATUS_TODO, 'label': 'To Do', 'tasks': task_columns[Task.STATUS_TODO], 'icon': 'list-task'},
             {'key': Task.STATUS_IN_PROGRESS, 'label': 'In Progress', 'tasks': task_columns[Task.STATUS_IN_PROGRESS], 'icon': 'activity'},
@@ -956,12 +1095,23 @@ def update_task_status(request, task_id):
         request.session.flush()
         return redirect('login')
 
+    next_url = request.POST.get('next', '').strip() or 'projects'
+
     task = Task.objects.select_related('project').filter(id=task_id).first()
     if not task:
         messages.error(request, 'Task not found.')
         return redirect('projects')
+    if not is_project_member(task.project, user):
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'message': 'You do not have access to this task.'}, status=403)
+        messages.error(request, 'You do not have access to this task.')
+        return redirect('projects')
+    if not is_project_manager(task.project, user) and task.assigned_to_id != user.id:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'message': 'Only the assignee or project manager can update this task.'}, status=403)
+        messages.error(request, 'Only the assignee or project manager can update this task.')
+        return redirect(next_url)
 
-    next_url = request.POST.get('next', '').strip() or 'projects'
     new_status = request.POST.get('status', '').strip()
     valid_statuses = {choice[0] for choice in Task.STATUS_CHOICES}
 
@@ -1004,6 +1154,11 @@ def task_detail(request, task_id):
     if not request.session.get('user_id'):
         return JsonResponse({'success': False, 'message': 'Authentication required.'}, status=401)
 
+    user = get_current_user(request)
+    if not user:
+        request.session.flush()
+        return JsonResponse({'success': False, 'message': 'User not found.'}, status=401)
+
     task = Task.objects.select_related('project', 'assigned_to').prefetch_related(
         'comments__user',
         'project__project_members__user',
@@ -1011,6 +1166,8 @@ def task_detail(request, task_id):
 
     if not task:
         return JsonResponse({'success': False, 'message': 'Task not found.'}, status=404)
+    if not is_project_member(task.project, user):
+        return JsonResponse({'success': False, 'message': 'You do not have access to this task.'}, status=403)
 
     return JsonResponse({'success': True, 'task': build_task_payload(task)})
 
@@ -1032,6 +1189,8 @@ def update_task(request, task_id):
     ).filter(id=task_id).first()
     if not task:
         return JsonResponse({'success': False, 'message': 'Task not found.'}, status=404)
+    if not is_project_manager(task.project, user):
+        return JsonResponse({'success': False, 'message': 'Only the project manager can edit task details.'}, status=403)
 
     title = request.POST.get('title', '').strip()
     description = request.POST.get('description', '').strip()
@@ -1098,6 +1257,8 @@ def add_task_comment(request, task_id):
     task = Task.objects.select_related('project').filter(id=task_id).first()
     if not task:
         return JsonResponse({'success': False, 'message': 'Task not found.'}, status=404)
+    if not is_project_member(task.project, user):
+        return JsonResponse({'success': False, 'message': 'You do not have access to this task.'}, status=403)
 
     comment_text = request.POST.get('comment', '').strip()
     if not comment_text:
@@ -1140,6 +1301,8 @@ def delete_task(request, task_id):
     task = Task.objects.select_related('project').filter(id=task_id).first()
     if not task:
         return JsonResponse({'success': False, 'message': 'Task not found.'}, status=404)
+    if not is_project_manager(task.project, user):
+        return JsonResponse({'success': False, 'message': 'Only the project manager can delete this task.'}, status=403)
 
     project_id = task.project_id
     task_title = task.title
@@ -1216,13 +1379,18 @@ def create_project(request):
         )
 
         member_queryset = Users.objects.filter(id__in=member_ids).distinct()
-        ProjectMember.objects.create(project=project, user=user, role='Manager')
+        sync_project_manager_membership(project, user)
 
         existing_member_ids = {user.id}
         for member in member_queryset:
             if member.id in existing_member_ids:
                 continue
-            ProjectMember.objects.create(project=project, user=member, role='Member')
+            ProjectMember.objects.create(
+                project=project,
+                user=member,
+                role=normalize_membership_role(request.POST.get(f'role_{member.id}', '')),
+                is_manager=False,
+            )
             existing_member_ids.add(member.id)
 
         ActivityLog.objects.create(
@@ -1238,7 +1406,8 @@ def create_project(request):
 
     return redirect(next_url)
 
-def profile(request):
+@csrf_protect
+def settings_view(request):
     if not request.session.get('user_id'):
         messages.warning(request, "Please login to continue.")
         return redirect('login')
@@ -1250,31 +1419,98 @@ def profile(request):
         return redirect('login')
 
     timezone_name = request.session.get('user_timezone') or timezone.get_current_timezone_name()
-    profile_zone = get_safe_timezone(timezone_name)
-    profile_now = timezone.now().astimezone(profile_zone)
-    managed_project = Project.objects.filter(manager=user).order_by('name').first()
-    member_project = Project.objects.filter(project_members__user=user).order_by('name').first()
+    settings_zone = get_safe_timezone(timezone_name)
+    settings_now = timezone.now().astimezone(settings_zone)
+    managed_projects = get_accessible_projects(user).filter(manager=user).count()
+    assigned_tasks = Task.objects.filter(assigned_to=user).count()
+
+    if request.method == 'POST':
+        action = request.POST.get('action', '').strip()
+
+        if action == 'account':
+            first_name = request.POST.get('first_name', '').strip()
+            last_name = request.POST.get('last_name', '').strip()
+            username = request.POST.get('username', '').strip()
+            email = request.POST.get('email', '').strip().lower()
+            selected_timezone = request.POST.get('timezone', '').strip() or timezone_name
+
+            if not first_name or not last_name or not username or not email:
+                messages.error(request, 'First name, last name, username, and email are required.')
+                return redirect('settings')
+
+            if Users.objects.exclude(id=user.id).filter(email__iexact=email).exists():
+                messages.error(request, 'That email address is already in use.')
+                return redirect('settings')
+
+            if Users.objects.exclude(id=user.id).filter(username__iexact=username).exists():
+                messages.error(request, 'That username is already taken.')
+                return redirect('settings')
+
+            user.first_name = first_name
+            user.last_name = last_name
+            user.username = username
+            user.email = email
+            user.save(update_fields=['first_name', 'last_name', 'username', 'email'])
+
+            request.session['user_email'] = user.email
+            request.session['user_full_name'] = f"{user.first_name or ''} {user.last_name or ''}".strip()
+            request.session['user_username'] = user.username
+            request.session['user_timezone'] = selected_timezone
+
+            ActivityLog.objects.create(
+                user=user,
+                action='updated account settings',
+            )
+            messages.success(request, 'Settings updated successfully.')
+            return redirect('settings')
+
+        if action == 'password':
+            current_password = request.POST.get('current_password', '')
+            new_password = request.POST.get('new_password', '')
+            confirm_password = request.POST.get('confirm_password', '')
+
+            if not current_password or not new_password or not confirm_password:
+                messages.error(request, 'All password fields are required.')
+                return redirect('settings')
+
+            if not user.check_password(current_password):
+                messages.error(request, 'Current password is incorrect.')
+                return redirect('settings')
+
+            if len(new_password) < 8:
+                messages.error(request, 'New password must be at least 8 characters long.')
+                return redirect('settings')
+
+            if new_password != confirm_password:
+                messages.error(request, 'New password and confirmation do not match.')
+                return redirect('settings')
+
+            user.set_password(new_password)
+            user.save(update_fields=['password'])
+
+            ActivityLog.objects.create(
+                user=user,
+                action='changed account password',
+            )
+            messages.success(request, 'Password updated successfully.')
+            return redirect('settings')
 
     context = build_dashboard_base_context(request, user)
     context.update({
-        'profile_role': (user.role or 'User').replace('_', ' ').title(),
-        'profile_joined': user.created_at.strftime('%b %Y') if user.created_at else 'Recently',
-        'profile_timezone': timezone_name,
-        'profile_timezone_label': f"{timezone_name.replace('_', ' ')} ({format_utc_offset(profile_now.utcoffset())})",
-        'profile_local_date': profile_now.strftime('%A, %B %d, %Y'),
-        'profile_local_time': profile_now.strftime('%I:%M:%S %p'),
-        'profile_team': managed_project.name if managed_project else (member_project.name if member_project else 'Taskly Workspace'),
-        'profile_location': 'Kathmandu, NP',
-        'profile_bio': f'{user.display_name} is collaborating in Taskly and keeping projects on track.',
-        'profile_skills': ['Task Management', 'Project Planning', 'Team Collaboration'],
+        'settings_timezone': timezone_name,
+        'settings_timezone_label': f"{timezone_name.replace('_', ' ')} ({format_utc_offset(settings_now.utcoffset())})",
+        'settings_joined': user.created_at.strftime('%b %d, %Y') if user.created_at else 'Recently',
+        'settings_project_count': managed_projects,
+        'settings_task_count': assigned_tasks,
+        'settings_member_count': ProjectMember.objects.filter(user=user).count(),
         'timezone_options': build_timezone_options(timezone_name),
     })
-    return render(request, 'dashboard/profile.html', context)
+    return render(request, 'dashboard/settings.html', context)
 
 
 @require_POST
 @csrf_protect
-def upload_profile_avatar(request):
+def upload_settings_avatar(request):
     if not request.session.get('user_id'):
         return JsonResponse({'success': False, 'message': 'Authentication required.'}, status=401)
 
@@ -1307,12 +1543,12 @@ def upload_profile_avatar(request):
 
     ActivityLog.objects.create(
         user=user,
-        action='updated profile photo',
+        action='updated account photo',
     )
 
     return JsonResponse({
         'success': True,
-        'message': 'Profile photo updated.',
+        'message': 'Photo updated successfully.',
         'user_id': user.id,
         'avatar_url': user.avatar_url,
         'user_initials': user.initials,

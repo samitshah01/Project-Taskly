@@ -1,0 +1,181 @@
+{% extends 'components/dashboard_base.html' %}
+
+{% block title %}Settings - Taskly{% endblock %}
+
+{% block dashboard_content %}
+<div class="settings-shell">
+    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3 fade-in">
+        <div>
+            <div class="board-breadcrumb">
+                <a href="{% url 'dashboard' %}">Dashboard</a>
+                <span>/</span>
+                <span>Settings</span>
+            </div>
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <div class="project-icon-wrap settings-page-icon">
+                    <i class="bi bi-sliders"></i>
+                </div>
+                <div>
+                    <h4 class="settings-title">Settings</h4>
+                    <p class="settings-subtitle">Manage your account details, photo, timezone, and password from one place.</p>
+                </div>
+            </div>
+        </div>
+        <div class="settings-hero-metrics">
+            <div class="settings-mini-stat">
+                <span class="settings-mini-label">Projects</span>
+                <strong>{{ settings_project_count }}</strong>
+            </div>
+            <div class="settings-mini-stat">
+                <span class="settings-mini-label">Tasks</span>
+                <strong>{{ settings_task_count }}</strong>
+            </div>
+            <div class="settings-mini-stat">
+                <span class="settings-mini-label">Memberships</span>
+                <strong>{{ settings_member_count }}</strong>
+            </div>
+        </div>
+    </div>
+
+    <div class="settings-grid">
+        <section class="settings-panel fade-in">
+            <div class="settings-panel-head">
+                <div>
+                    <h5>Photo</h5>
+                    <p>Upload the photo shown across the workspace.</p>
+                </div>
+            </div>
+
+            <div class="settings-photo-wrap">
+                <div class="settings-photo-avatar" id="settingsAvatarDisplay" data-avatar-user-id="{{ user.id }}" data-avatar-initials="{{ user.initials }}">
+                    {% if user_avatar_url %}
+                    <img src="{{ user_avatar_url }}" alt="{{ user.display_name }}" class="avatar-media avatar-media-cover">
+                    {% else %}
+                    {{ user.initials }}
+                    {% endif %}
+                </div>
+                <div class="settings-photo-copy">
+                    <div class="settings-photo-name">{{ user.display_name }}</div>
+                    <div class="settings-photo-meta">{{ user.email }}</div>
+                </div>
+                <input type="file" id="settingsAvatarInput" class="d-none" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif">
+                <button type="button" class="btn-primary-custom" id="settingsAvatarTrigger">
+                    <i class="bi bi-camera"></i> Upload Photo
+                </button>
+            </div>
+        </section>
+
+        <section class="settings-panel fade-in">
+            <div class="settings-panel-head">
+                <div>
+                    <h5>Account Details</h5>
+                    <p>Update the core account information used across Taskly.</p>
+                </div>
+            </div>
+
+            <form method="post" class="settings-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="account">
+
+                <div class="settings-form-grid">
+                    <div>
+                        <label class="form-label">First Name</label>
+                        <input type="text" name="first_name" class="form-control" value="{{ user.first_name|default:'' }}" required>
+                    </div>
+                    <div>
+                        <label class="form-label">Last Name</label>
+                        <input type="text" name="last_name" class="form-control" value="{{ user.last_name|default:'' }}" required>
+                    </div>
+                    <div>
+                        <label class="form-label">Username</label>
+                        <input type="text" name="username" class="form-control" value="{{ user.username|default:'' }}" required>
+                    </div>
+                    <div>
+                        <label class="form-label">Email</label>
+                        <input type="email" name="email" class="form-control" value="{{ user.email }}" required>
+                    </div>
+                    <div class="settings-form-span-2">
+                        <label class="form-label">Timezone</label>
+                        <select class="form-select" name="timezone">
+                            {% for option in timezone_options %}
+                            <option value="{{ option.value }}" {% if option.selected %}selected{% endif %}>{{ option.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="settings-actions">
+                    <button type="submit" class="btn-primary-custom">Save Changes</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="settings-panel fade-in settings-panel-security">
+            <div class="settings-panel-head">
+                <div>
+                    <h5>Security</h5>
+                    <p>Change your password and keep your account protected.</p>
+                </div>
+                <span class="settings-chip"><i class="bi bi-shield-lock"></i> Secure</span>
+            </div>
+
+            <form method="post" class="settings-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="password">
+
+                <div class="settings-form-grid">
+                    <div class="settings-form-span-2">
+                        <label class="form-label">Current Password</label>
+                        <input type="password" name="current_password" class="form-control" required>
+                    </div>
+                    <div>
+                        <label class="form-label">New Password</label>
+                        <input type="password" name="new_password" class="form-control" required>
+                    </div>
+                    <div>
+                        <label class="form-label">Confirm Password</label>
+                        <input type="password" name="confirm_password" class="form-control" required>
+                    </div>
+                </div>
+
+                <div class="settings-actions">
+                    <button type="submit" class="btn-primary-custom">Update Password</button>
+                </div>
+            </form>
+        </section>
+    </div>
+
+    <section class="settings-panel fade-in settings-summary-panel">
+        <div class="settings-panel-head">
+            <div>
+                <h5>Account Summary</h5>
+                <p>Quick reference details for your current workspace presence.</p>
+            </div>
+        </div>
+
+        <div class="settings-summary-grid">
+            <div class="settings-summary-item">
+                <span class="settings-summary-label">Display Name</span>
+                <strong>{{ user.display_name }}</strong>
+            </div>
+            <div class="settings-summary-item">
+                <span class="settings-summary-label">Current Timezone</span>
+                <strong>{{ settings_timezone_label }}</strong>
+            </div>
+            <div class="settings-summary-item">
+                <span class="settings-summary-label">Member Since</span>
+                <strong>{{ settings_joined }}</strong>
+            </div>
+            <div class="settings-summary-item">
+                <span class="settings-summary-label">Email</span>
+                <strong>{{ user.email }}</strong>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+    const uploadSettingsAvatarUrl = "{% url 'upload_settings_avatar' %}";
+</script>
+{% endblock %}

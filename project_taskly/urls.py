@@ -29,7 +29,8 @@ urlpatterns = [
     path('dashboard/projects/<int:project_id>/delete/', views.delete_project, name='delete_project'),
     path('dashboard/projects', views.projects, name='projects'),
     path('dashboard/projects/<int:project_id>/', views.project_board, name='project_board'),
-    path('dashboard/profile', views.profile, name='profile'),
-    path('dashboard/profile/avatar/', views.upload_profile_avatar, name='upload_profile_avatar'),
+    path('dashboard/settings', views.settings_view, name='settings'),
+    path('dashboard/settings/avatar/', views.upload_settings_avatar, name='upload_settings_avatar'),
+    
     path('logout/', views.logout, name='logout'),
 ]

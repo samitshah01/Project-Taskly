@@ -11,6 +11,7 @@
         </div>
 
         <div class="modal-body">
+          {% if task_project_options %}
           <div style="display:flex;flex-direction:column;gap:14px;">
             <div>
               <label class="form-label">Task Title</label>
@@ -66,11 +67,14 @@
               </select>
             </div>
           </div>
+          {% else %}
+          <p style="margin:0;color:var(--muted);font-size:13px;">You can create tasks only in projects where you are the Project Manager.</p>
+          {% endif %}
         </div>
 
         <div class="modal-footer">
           <button type="button" class="btn-ghost" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn-primary-custom">Create Task</button>
+          <button type="submit" class="btn-primary-custom" {% if not task_project_options %}disabled{% endif %}>Create Task</button>
         </div>
       </form>
     </div>

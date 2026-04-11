@@ -113,6 +113,7 @@ class ProjectMember(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='project_members')
     user = models.ForeignKey(Users, on_delete=models.CASCADE, related_name='project_memberships')
     role = models.CharField(max_length=100, blank=True, null=True)
+    is_manager = models.BooleanField(default=False)
     joined_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
@@ -122,6 +123,12 @@ class ProjectMember(models.Model):
 
     def __str__(self):
         return f'{self.user.display_name} - {self.project.name}'
+
+    @property
+    def display_role(self):
+        if self.is_manager:
+            return self.role or 'Project Manager'
+        return self.role or 'Team Member'
 
 
 class Task(models.Model):

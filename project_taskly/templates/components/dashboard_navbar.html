@@ -9,8 +9,13 @@
     <div class="sidebar-section">
         <div class="sidebar-label">Main Menu</div>
         <a href="{% url 'dashboard' %}" class="nav-item-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"><i class="bi bi-grid-1x2"></i>Dashboard</a>
-        <a href="{% url 'tasks' %}" class="nav-item-link {% if request.resolver_match.url_name == 'tasks' %}active{% endif %}"><i class="bi bi-check2-circle"></i> My Tasks <span class="nav-badge">{{ sidebar_task_count }}</span></a>
         <a href="{% url 'projects' %}" class="nav-item-link {% if request.resolver_match.url_name == 'projects' %}active{% endif %}"><i class="bi bi-folder2"></i> Projects <span class="nav-badge">{{ sidebar_project_count }}</span></a>
+        <a href="{% url 'tasks' %}" class="nav-item-link {% if request.resolver_match.url_name == 'tasks' %}active{% endif %}"><i class="bi bi-check2-circle"></i> My Tasks <span class="nav-badge">{{ sidebar_task_count }}</span></a>
+    </div>
+
+    <div class="sidebar-section">
+        <div class="sidebar-label">Account</div>
+        <a href="{% url 'settings' %}" class="nav-item-link {% if request.resolver_match.url_name == 'settings' %}active{% endif %}"><i class="bi bi-sliders"></i> Settings</a>
     </div>
 </aside>
 
