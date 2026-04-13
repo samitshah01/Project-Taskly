@@ -20,6 +20,7 @@ class Users(models.Model):
     password = models.CharField(max_length=255)
     role = models.CharField(max_length=50, default='user')
     is_email_verified = models.BooleanField(default=False)
+    email_notifications_enabled = models.BooleanField(default=True)
     created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
@@ -367,6 +368,67 @@ class EmployeePayroll(models.Model):
     @property
     def net_pay(self):
         return (self.base_salary or 0) + (self.bonus or 0) - (self.deduction or 0)
+
+
+class EmailNotificationLog(models.Model):
+    TYPE_TASK_ASSIGNMENT = 'task_assignment'
+    TYPE_PAYMENT = 'payment'
+    TYPE_TASK_DUE_REMINDER = 'task_due_reminder'
+    TYPE_WELCOME = 'welcome'
+    TYPE_GENERIC = 'generic'
+
+    STATUS_PENDING = 'pending'
+    STATUS_SENT = 'sent'
+    STATUS_FAILED = 'failed'
+    STATUS_SKIPPED = 'skipped'
+
+    NOTIFICATION_TYPE_CHOICES = [
+        (TYPE_TASK_ASSIGNMENT, 'Task Assignment'),
+        (TYPE_PAYMENT, 'Payment'),
+        (TYPE_TASK_DUE_REMINDER, 'Task Due Reminder'),
+        (TYPE_WELCOME, 'Welcome'),
+        (TYPE_GENERIC, 'Generic'),
+    ]
+
+    DELIVERY_STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_SENT, 'Sent'),
+        (STATUS_FAILED, 'Failed'),
+        (STATUS_SKIPPED, 'Skipped'),
+    ]
+
+    user = models.ForeignKey(Users, on_delete=models.CASCADE, related_name='email_notification_logs')
+    task = models.ForeignKey(
+        Task,
+        on_delete=models.CASCADE,
+        related_name='email_notification_logs',
+        blank=True,
+        null=True,
+    )
+    expense = models.ForeignKey(
+        Expense,
+        on_delete=models.CASCADE,
+        related_name='email_notification_logs',
+        blank=True,
+        null=True,
+    )
+    notification_type = models.CharField(max_length=40, choices=NOTIFICATION_TYPE_CHOICES)
+    reminder_stage = models.PositiveSmallIntegerField(blank=True, null=True)
+    recipient_email = models.EmailField()
+    subject = models.CharField(max_length=255)
+    idempotency_key = models.CharField(max_length=255, unique=True)
+    status = models.CharField(max_length=20, choices=DELIVERY_STATUS_CHOICES, default=STATUS_PENDING)
+    error_message = models.TextField(blank=True, null=True)
+    sent_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'email_notification_logs'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.get_notification_type_display()} -> {self.recipient_email}'
 
 
 class TaskComment(models.Model):

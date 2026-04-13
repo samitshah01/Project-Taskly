@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ email_title }}</title>
+</head>
+<body style="margin:0; padding:0; background:#0b1220; color:#e5eefc; font-family:Segoe UI, Arial, sans-serif;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#0b1220; padding:32px 12px;">
+        <tr>
+            <td align="center">
+                <table width="640" cellpadding="0" cellspacing="0" style="width:640px; max-width:640px; background:#111a2d; border:1px solid #223252; border-radius:20px; overflow:hidden;">
+                    <tr>
+                        <td style="padding:32px 32px 20px; background:linear-gradient(135deg, #111a2d 0%, #162443 100%);">
+                            <div style="display:inline-block; padding:6px 12px; border-radius:999px; background:#1b2e57; color:#7fb3ff; font-size:12px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase;">
+                                {{ email_badge|default:"Taskly" }}
+                            </div>
+                            <h1 style="margin:18px 0 12px; font-size:28px; line-height:1.2; color:#ffffff;">{{ email_title }}</h1>
+                            <p style="margin:0; font-size:15px; line-height:1.7; color:#b8c5db;">
+                                Hi {{ recipient_name|default:"there" }},
+                                <br><br>
+                                {{ email_intro }}
+                            </p>
+                        </td>
+                    </tr>
+                    {% if detail_rows %}
+                    <tr>
+                        <td style="padding:0 32px 12px;">
+                            <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+                                {% for row in detail_rows %}
+                                <tr>
+                                    <td style="padding:14px 0; border-bottom:1px solid #223252; color:#8fa3c4; font-size:13px; width:36%;">{{ row.label }}</td>
+                                    <td style="padding:14px 0; border-bottom:1px solid #223252; color:#f8fbff; font-size:14px; font-weight:600;">{{ row.value }}</td>
+                                </tr>
+                                {% endfor %}
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% block body %}{% endblock %}
+                    {% if cta_url %}
+                    <tr>
+                        <td style="padding:8px 32px 20px;">
+                            <a href="{{ cta_url }}" style="display:inline-block; background:#4f7cff; color:#ffffff; text-decoration:none; font-weight:700; font-size:14px; padding:14px 20px; border-radius:12px;">
+                                {{ cta_label|default:"Open Taskly" }}
+                            </a>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    <tr>
+                        <td style="padding:0 32px 32px; color:#8fa3c4; font-size:13px; line-height:1.7;">
+                            Taskly helps your team stay on top of work, deadlines, and project finances.
+                            {% if support_email %}
+                            <br>
+                            Need help? Reply via {{ support_email }}.
+                            {% endif %}
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

@@ -15,10 +15,10 @@ from django.contrib.auth.hashers import check_password
 from django.views.decorators.csrf import csrf_protect
 from django.db.models import Count, Q, Sum, Case, When, IntegerField
 from django.db.models.functions import TruncMonth
-from django.core.mail import send_mail
 from django.core.paginator import Paginator
-from .models import Users, Project, Task, ActivityLog, ProjectMember, ProjectFile, Expense, ExpenseCategory, EmployeeProfile, EmployeePayroll
+from .models import Users, Project, Task, ActivityLog, ProjectMember, ProjectFile, Expense, ExpenseCategory, EmployeeProfile, EmployeePayroll, EmailNotificationLog
 from django.http import JsonResponse, FileResponse, Http404, HttpResponse
+from .notifications import send_generic_notification
 from .utils import create_and_send_otp, verify_otp, mask_email
 from django.contrib.auth.hashers import make_password
 from django.views.decorators.http import require_POST
@@ -391,12 +391,8 @@ def send_user_email_notification(user, subject, message):
     if not user or not user.email:
         return
 
-    sender = settings.DEFAULT_FROM_EMAIL or settings.EMAIL_HOST_USER
-    if not sender:
-        return
-
     try:
-        send_mail(subject, message, sender, [user.email], fail_silently=True)
+        send_generic_notification(user, subject, message)
     except Exception as exc:
         logger.warning("Email notification failed for user_id=%s: %s", user.id, exc)
 
@@ -1160,19 +1156,6 @@ def create_task(request):
             project=project,
             task=task,
         )
-
-        if assigned_user and assigned_user.id != user.id:
-            send_user_email_notification(
-                assigned_user,
-                f'New Task Assigned: {task.title}',
-                (
-                    f'Hi {assigned_user.display_name},\n\n'
-                    f'You have been assigned the task "{task.title}" in project "{project.name}".\n'
-                    f'Status: {task.get_status_display()}\n'
-                    f'Priority: {task.get_priority_display()}\n\n'
-                    'Please log in to Taskly to review the details.'
-                ),
-            )
 
         messages.success(request, 'Task created successfully.')
     except Exception as exc:
@@ -2288,19 +2271,6 @@ def update_task(request, task_id):
         task=task,
     )
 
-    if assigned_user and assigned_user.id != user.id and previous_assigned_to_id != assigned_user.id:
-        send_user_email_notification(
-            assigned_user,
-            f'Task Reassigned: {task.title}',
-            (
-                f'Hi {assigned_user.display_name},\n\n'
-                f'You have been assigned the task "{task.title}" in project "{task.project.name}".\n'
-                f'Status: {task.get_status_display()}\n'
-                f'Priority: {task.get_priority_display()}\n\n'
-                'Please log in to Taskly to review the latest changes.'
-            ),
-        )
-
     task.refresh_from_db()
     task = Task.objects.select_related('project', 'assigned_to').prefetch_related(
         'comments__user',
@@ -2983,6 +2953,7 @@ def settings_view(request):
             username = request.POST.get('username', '').strip()
             email = request.POST.get('email', '').strip().lower()
             selected_timezone = request.POST.get('timezone', '').strip() or timezone_name
+            email_notifications_enabled = request.POST.get('email_notifications_enabled') == 'on'
 
             if not first_name or not last_name or not username or not email:
                 messages.error(request, 'First name, last name, username, and email are required.')
@@ -3000,7 +2971,8 @@ def settings_view(request):
             user.last_name = last_name
             user.username = username
             user.email = email
-            user.save(update_fields=['first_name', 'last_name', 'username', 'email'])
+            user.email_notifications_enabled = email_notifications_enabled
+            user.save(update_fields=['first_name', 'last_name', 'username', 'email', 'email_notifications_enabled'])
 
             request.session['user_email'] = user.email
             request.session['user_full_name'] = f"{user.first_name or ''} {user.last_name or ''}".strip()
@@ -3053,6 +3025,10 @@ def settings_view(request):
         'settings_project_count': managed_projects,
         'settings_task_count': assigned_tasks,
         'settings_member_count': ProjectMember.objects.filter(user=user).count(),
+        'settings_email_notification_count': EmailNotificationLog.objects.filter(
+            user=user,
+            status=EmailNotificationLog.STATUS_SENT,
+        ).count(),
         'timezone_options': build_timezone_options(timezone_name),
     })
     return render(request, 'dashboard/settings.html', context)

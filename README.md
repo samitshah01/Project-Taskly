@@ -34,17 +34,13 @@ This is a Django-based **project management tool** called **Taskly**.
     ```
     - Open the `.env` and insert your values for database, secret key, etc.
 
-4. **Import the SQL database**
-    - The SQL dump is locaed in the `db_dump` folder.
-    - Use MYSQL command line or a GUI tool to import the file. example: **HEIDISQL** for windows
-
-5. **Run Migration (if needed):**
+4. **Run Migration:**
     ```bash
     python manage.py makemigrations
     python manage.py migrate
     ```
 
-6. **Run the server:**
+5. **Run the server:**
     ```bash
     python manage.py runserver
     ```

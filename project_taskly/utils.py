@@ -1,12 +1,26 @@
 import random
+import logging
 import smtplib
 from email.message import EmailMessage
+from datetime import timedelta
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.contrib.auth.hashers import make_password, check_password
-from datetime import timedelta
 from .models import PasswordOTP
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
+REMINDER_STAGES = (7, 3, 2, 1)
+
+
+def _open_smtp_connection():
+    smtp_class = smtplib.SMTP_SSL if settings.EMAIL_USE_SSL else smtplib.SMTP
+    server = smtp_class(settings.EMAIL_HOST, settings.EMAIL_PORT)
+    if settings.EMAIL_USE_TLS and not settings.EMAIL_USE_SSL:
+        server.starttls()
+    if settings.EMAIL_HOST_USER and settings.EMAIL_HOST_PASSWORD:
+        server.login(settings.EMAIL_HOST_USER, settings.EMAIL_HOST_PASSWORD)
+    return server
 
 def generate_otp(length=6):
     return ''.join([str(random.randint(0, 9)) for _ in range(length)])
@@ -32,23 +46,21 @@ def send_otp_email(email, otp, purpose='password_reset'):
         'email_headline': email_content['headline'],
         'email_message': email_content['message'],
     })
-
-    msg = EmailMessage()
-    msg['Subject'] = email_content['subject']
-    msg['From'] = settings.DEFAULT_FROM_EMAIL
-    msg['To'] = email
-    msg.set_content("Your email client does not support HTML")
-    msg.add_alternative(html_content, subtype='html')
+    sender = settings.DEFAULT_FROM_EMAIL or settings.EMAIL_HOST_USER
 
     try:
-        with smtplib.SMTP(settings.EMAIL_HOST, settings.EMAIL_PORT) as server:
-            if settings.EMAIL_USE_TLS:
-                server.starttls()
-            server.login(settings.EMAIL_HOST_USER, settings.EMAIL_HOST_PASSWORD)
-            server.send_message(msg)
-        print(f"OTP sent to {email}")
+        message = EmailMessage()
+        message['Subject'] = email_content['subject']
+        message['From'] = sender
+        message['To'] = email
+        message.set_content('Your email client does not support HTML.')
+        message.add_alternative(html_content, subtype='html')
+
+        with _open_smtp_connection() as server:
+            server.send_message(message)
     except Exception as e:
-        print("Error sending OTP:", e)
+        logger.exception("OTP email send failed for %s", email)
+        raise
 
 def create_and_send_otp(email, purpose='password_reset'):
     now = timezone.now()
@@ -101,3 +113,31 @@ def mask_email(email):
         return name[:2] + "***@" + domain
     except:
         return email
+
+
+def process_due_task_reminders(*, async_delivery=True):
+    from .models import Task
+    from .notifications import send_task_due_reminder
+
+    today = timezone.localdate()
+    sent_count = 0
+
+    for days_before in REMINDER_STAGES:
+        due_date = today + timedelta(days=days_before)
+        tasks = Task.objects.select_related('project', 'assigned_to').filter(
+            due_date=due_date,
+            assigned_to__isnull=False,
+        ).exclude(status=Task.STATUS_COMPLETED)
+
+        for task in tasks:
+            try:
+                if send_task_due_reminder(task, days_before, async_delivery=async_delivery):
+                    sent_count += 1
+            except Exception:
+                logger.exception(
+                    'Task due reminder processing failed for task_id=%s stage=%s',
+                    task.id,
+                    days_before,
+                )
+
+    return sent_count

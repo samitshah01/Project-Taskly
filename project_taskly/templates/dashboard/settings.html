@@ -102,6 +102,13 @@
                             {% endfor %}
                         </select>
                     </div>
+                    <div class="settings-form-span-2">
+                        <label class="form-label d-block">Email Notifications</label>
+                        <label class="d-flex align-items-center gap-2 text-white-50">
+                            <input type="checkbox" name="email_notifications_enabled" {% if user.email_notifications_enabled %}checked{% endif %}>
+                            <span>Send task, payment, reminder, and welcome emails to my inbox</span>
+                        </label>
+                    </div>
                 </div>
 
                 <div class="settings-actions">
@@ -183,6 +190,10 @@
                 <div class="settings-summary-item">
                     <span class="settings-summary-label">Email</span>
                     <strong>{{ user.email }}</strong>
+                </div>
+                <div class="settings-summary-item">
+                    <span class="settings-summary-label">Emails Sent</span>
+                    <strong>{{ settings_email_notification_count }}</strong>
                 </div>
             </div>
         </section>
