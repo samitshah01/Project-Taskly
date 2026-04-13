@@ -3,18 +3,21 @@ import json
 import os
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError, available_timezones
 from decimal import Decimal, InvalidOperation
+from datetime import date
 from django.conf import settings
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.utils import timezone
 from django.urls import reverse
 from django.utils.timesince import timesince
-from django.utils.dateparse import parse_datetime
+from django.utils.dateparse import parse_date, parse_datetime
 from django.contrib.auth.hashers import check_password
 from django.views.decorators.csrf import csrf_protect
 from django.db.models import Count, Q, Sum, Case, When, IntegerField
-from .models import Users, Project, Task, ActivityLog, ProjectMember
-from django.http import JsonResponse
+from django.core.mail import send_mail
+from django.core.paginator import Paginator
+from .models import Users, Project, Task, ActivityLog, ProjectMember, ProjectFile, Expense, ExpenseCategory, EmployeeProfile, EmployeePayroll
+from django.http import JsonResponse, FileResponse, Http404, HttpResponse
 from .utils import create_and_send_otp, verify_otp, mask_email
 from django.contrib.auth.hashers import make_password
 from django.views.decorators.http import require_POST
@@ -22,6 +25,17 @@ import logging
 
 logger = logging.getLogger(__name__)
 NOTIFICATIONS_LAST_SEEN_SESSION_KEY = 'notifications_last_seen_at'
+PROJECT_STATUS_WORKFLOW = {
+    Project.STATUS_PLANNED: {Project.STATUS_IN_PROGRESS, Project.STATUS_ON_HOLD},
+    Project.STATUS_IN_PROGRESS: {Project.STATUS_ON_HOLD, Project.STATUS_COMPLETED},
+    Project.STATUS_ON_HOLD: {Project.STATUS_IN_PROGRESS, Project.STATUS_COMPLETED},
+    Project.STATUS_COMPLETED: set(),
+}
+TASK_STATUS_WORKFLOW = {
+    Task.STATUS_TODO: {Task.STATUS_IN_PROGRESS},
+    Task.STATUS_IN_PROGRESS: {Task.STATUS_TODO, Task.STATUS_COMPLETED},
+    Task.STATUS_COMPLETED: {Task.STATUS_IN_PROGRESS},
+}
 
 
 def format_utc_offset(offset):
@@ -85,9 +99,17 @@ def get_project_membership(project, user):
     membership = project.project_members.filter(user=user).first()
     if membership:
         return membership
-    if project.manager_id and project.manager_id == user.id:
+    if (project.manager_id and project.manager_id == user.id) or (getattr(project, 'owner_id', None) and project.owner_id == user.id):
         return sync_project_manager_membership(project, user)
     return None
+
+
+def get_project_owner_id(project):
+    return getattr(project, 'owner_id', None) or project.manager_id
+
+
+def is_project_owner(project, user):
+    return bool(project and user and get_project_owner_id(project) == user.id)
 
 
 def is_project_manager(project, user):
@@ -97,6 +119,18 @@ def is_project_manager(project, user):
     return bool(project.manager_id and user and project.manager_id == user.id)
 
 
+def has_project_full_access(project, user):
+    return is_project_owner(project, user) or is_project_manager(project, user)
+
+
+def can_view_project_budget(project, user):
+    return is_project_owner(project, user)
+
+
+def can_manage_project_finances(project, user):
+    return is_project_owner(project, user)
+
+
 def is_project_member(project, user):
     return get_project_membership(project, user) is not None
 
@@ -104,9 +138,28 @@ def is_project_member(project, user):
 def get_accessible_projects(user):
     if not user:
         return Project.objects.none()
-    return Project.objects.select_related('manager').prefetch_related('tasks', 'project_members__user').filter(
-        Q(project_members__user=user) | Q(manager=user)
+    return Project.objects.select_related('manager', 'owner').prefetch_related('tasks', 'project_members__user').filter(
+        Q(project_members__user=user) | Q(manager=user) | Q(owner=user)
     ).distinct()
+
+
+def get_budget_visible_projects(user):
+    accessible_projects = list(get_accessible_projects(user))
+    allowed_ids = [project.id for project in accessible_projects if can_view_project_budget(project, user)]
+    return Project.objects.select_related('manager', 'owner').prefetch_related('tasks', 'project_members__user').filter(id__in=allowed_ids)
+
+
+def get_default_finance_project(user):
+    if not user:
+        return None
+    owned_project = get_accessible_projects(user).filter(owner=user).order_by('name').first()
+    if owned_project:
+        return owned_project
+    return get_accessible_projects(user).order_by('name').first()
+
+
+def get_project_budget_url(project):
+    return reverse('project_budget', args=[project.id])
 
 
 def sync_project_manager_membership(project, manager_user, role_label='Project Manager'):
@@ -127,6 +180,53 @@ def sync_project_manager_membership(project, manager_user, role_label='Project M
     return membership
 
 
+DEFAULT_FIXED_CATEGORY_NAMES = ['Salary', 'Tools', 'Services', 'Miscellaneous']
+FINANCE_ENTRY_KIND_CHOICES = [
+    ('income', 'Income'),
+    ('expense', 'Expense'),
+    ('salary', 'Salary Payment'),
+]
+PROJECT_ROLE_CHOICES = [
+    ('product_owner', 'Product Owner'),
+    ('project_manager', 'Project Manager'),
+    ('client', 'Client'),
+    ('developer', 'Developer'),
+    ('designer', 'Designer'),
+    ('qa_engineer', 'QA Engineer'),
+    ('business_analyst', 'Business Analyst'),
+    ('devops_engineer', 'DevOps Engineer'),
+]
+
+
+def normalize_category_name(value):
+    return " ".join((value or '').strip().split())
+
+
+def ensure_default_expense_categories(project, user=None):
+    if not project:
+        return
+    existing_names = set(project.expense_categories.filter(is_fixed=True).values_list('name', flat=True))
+    missing_names = [name for name in DEFAULT_FIXED_CATEGORY_NAMES if name not in existing_names]
+    for name in missing_names:
+        ExpenseCategory.objects.create(
+            project=project,
+            name=name,
+            is_fixed=True,
+            created_by=user,
+        )
+
+
+def get_salary_category(project, user=None):
+    ensure_default_expense_categories(project, user)
+    category = project.expense_categories.filter(name__iexact='Salary').first()
+    if category:
+        return category
+    return ExpenseCategory.objects.create(
+        project=project,
+        name='Salary',
+        is_fixed=True,
+        created_by=user,
+    )
 def build_role_badge_class(role_name, is_manager=False):
     if is_manager:
         return 'bg-primary'
@@ -146,6 +246,20 @@ def normalize_membership_role(role_name, is_manager=False):
     if is_manager:
         return cleaned_role or 'Project Manager'
     return cleaned_role or 'Team Member'
+
+
+def get_project_role_options():
+    return [{'value': value, 'label': label} for value, label in PROJECT_ROLE_CHOICES]
+
+
+def normalize_project_role_value(role_value, is_manager=False):
+    normalized = (role_value or '').strip().lower()
+    role_map = dict(PROJECT_ROLE_CHOICES)
+    if is_manager:
+        return 'Project Manager'
+    if normalized in role_map:
+        return role_map[normalized]
+    return 'Developer'
 
 
 def build_member_entry(membership, current_user_id=None):
@@ -252,11 +366,156 @@ def get_notifications_last_seen(request):
     return parsed_value
 
 
+def can_transition_project_status(current_status, next_status):
+    if current_status == next_status:
+        return True
+    return next_status in PROJECT_STATUS_WORKFLOW.get(current_status, set())
+
+
+def can_transition_task_status(current_status, next_status):
+    if current_status == next_status:
+        return True
+    return next_status in TASK_STATUS_WORKFLOW.get(current_status, set())
+
+
+def send_user_email_notification(user, subject, message):
+    if not user or not user.email:
+        return
+
+    sender = settings.DEFAULT_FROM_EMAIL or settings.EMAIL_HOST_USER
+    if not sender:
+        return
+
+    try:
+        send_mail(subject, message, sender, [user.email], fail_silently=True)
+    except Exception as exc:
+        logger.warning("Email notification failed for user_id=%s: %s", user.id, exc)
+
+
+def get_user_mentions(comment_text):
+    usernames = {match.lower() for match in re.findall(r'@([A-Za-z0-9_]{3,50})', comment_text or "")}
+    if not usernames:
+        return []
+    return list(Users.objects.filter(username__iregex=r'^(?:' + '|'.join(re.escape(name) for name in usernames) + r')$'))
+
+
+def get_project_file_absolute_path(project_file):
+    relative_path = (project_file.file or "").replace("/", os.sep)
+    return os.path.join(settings.MEDIA_ROOT, relative_path)
+
+
+def build_budget_rows(projects, current_user):
+    budget_rows = []
+    total_budget = Decimal('0')
+    total_actual = Decimal('0')
+
+    for project in projects:
+        actual = project.expenses.filter(transaction_type=Expense.TYPE_EXPENSE).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        remaining = project.budget - actual
+        usage_percent = min(100, round((actual / project.budget) * 100)) if project.budget else 0
+        categories = list(project.expense_categories.all())
+        expenses = list(
+            project.expenses.filter(transaction_type=Expense.TYPE_EXPENSE).select_related('category').order_by('-created_at')[:6]
+        )
+        budget_rows.append({
+            'project': project,
+            'actual': actual,
+            'remaining': remaining,
+            'usage_percent': usage_percent,
+            'categories': categories,
+            'expenses': expenses,
+            'can_manage': can_manage_project_finances(project, current_user),
+        })
+        total_budget += project.budget or Decimal('0')
+        total_actual += actual
+
+    return budget_rows, total_budget, total_actual
+
+
+def build_finance_badge_class(status):
+    return {
+        Expense.STATUS_PAID: 'bg-success-subtle text-success border border-success-subtle',
+        Expense.STATUS_PENDING: 'bg-warning-subtle text-warning border border-warning-subtle',
+        Expense.STATUS_CANCELLED: 'bg-danger-subtle text-danger border border-danger-subtle',
+        Expense.STATUS_OVERDUE: 'bg-danger-subtle text-danger border border-danger-subtle',
+    }.get(status, 'bg-secondary-subtle text-light border border-secondary-subtle')
+
+
+def build_finance_rows(transactions):
+    rows = []
+    income_total = Decimal('0')
+    expense_total = Decimal('0')
+    salary_total = Decimal('0')
+
+    for transaction in transactions:
+        amount = transaction.amount or Decimal('0')
+        if transaction.transaction_type == Expense.TYPE_INCOME:
+            income_total += amount
+        else:
+            expense_total += amount
+            if transaction.is_salary_payment:
+                salary_total += amount
+
+        rows.append({
+            'object': transaction,
+            'title': transaction.display_title,
+            'project_name': transaction.project.name,
+            'project_id': transaction.project_id,
+            'category_name': transaction.category_name,
+            'reference_id': transaction.reference_id or f'TXN-{transaction.id:04d}',
+            'issue_date': transaction.issue_date,
+            'paid_date': transaction.paid_date,
+            'status': transaction.status,
+            'status_label': transaction.get_status_display(),
+            'status_badge_class': build_finance_badge_class(transaction.status),
+            'amount': amount,
+            'is_income': transaction.transaction_type == Expense.TYPE_INCOME,
+            'is_salary_payment': transaction.is_salary_payment,
+            'entry_kind_label': 'Salary Payment' if transaction.is_salary_payment else ('Income' if transaction.transaction_type == Expense.TYPE_INCOME else 'Expense'),
+            'assigned_user_name': transaction.assigned_user.display_name if transaction.assigned_user else '',
+        })
+
+    return rows, income_total, expense_total, salary_total, income_total - expense_total
+
+
+def get_profile_badge_class(status):
+    return {
+        EmployeeProfile.STATUS_ACTIVE: 'bg-success-subtle text-success border border-success-subtle',
+        EmployeeProfile.STATUS_ON_LEAVE: 'bg-warning-subtle text-warning border border-warning-subtle',
+        EmployeeProfile.STATUS_INACTIVE: 'bg-secondary-subtle text-light border border-secondary-subtle',
+    }.get(status, 'bg-secondary-subtle text-light border border-secondary-subtle')
+
+
+def get_assignment_badge_class(status):
+    return {
+        'active': 'bg-primary-subtle text-primary border border-primary-subtle',
+        'planned': 'bg-info-subtle text-info border border-info-subtle',
+        'completed': 'bg-success-subtle text-success border border-success-subtle',
+        'on_hold': 'bg-warning-subtle text-warning border border-warning-subtle',
+    }.get(status, 'bg-secondary-subtle text-light border border-secondary-subtle')
+
+
+def ensure_employee_profile(user):
+    if not user:
+        return None
+    profile, _ = EmployeeProfile.objects.get_or_create(
+        user=user,
+        defaults={
+            'employee_type': EmployeeProfile.TYPE_FULL_TIME,
+            'salary': Decimal('0'),
+            'join_date': user.created_at.date() if user.created_at else timezone.localdate(),
+            'status': EmployeeProfile.STATUS_ACTIVE,
+        },
+    )
+    return profile
+
+
 def build_dashboard_base_context(request, user):
     accessible_projects = list(get_accessible_projects(user))
     project_count = len(accessible_projects)
     task_count = Task.objects.filter(assigned_to=user).count()
-    task_projects = [project for project in accessible_projects if is_project_manager(project, user)]
+    task_projects = [project for project in accessible_projects if has_project_full_access(project, user)]
+    finance_project = get_default_finance_project(user)
     notifications_last_seen = get_notifications_last_seen(request)
     notification_qs = ActivityLog.objects.select_related('user', 'project', 'task').filter(
         Q(user=user) | Q(project__project_members__user=user)
@@ -302,6 +561,7 @@ def build_dashboard_base_context(request, user):
         'task_project_options': task_projects,
         'task_project_member_map': task_project_member_map,
         'managed_project_ids': [project.id for project in task_projects],
+        'finance_nav_url': get_project_budget_url(finance_project) if finance_project else reverse('projects'),
     }
 
 @require_POST
@@ -617,7 +877,8 @@ def dashboard(request):
     )[:6])
 
     project_rows = []
-    projects = list(get_accessible_projects(user)[:4])
+    accessible_projects = list(get_accessible_projects(user).prefetch_related('expenses', 'expense_categories') )
+    projects = accessible_projects[:4]
     for project in projects:
         membership = get_project_membership(project, user)
         project_tasks = list(project.tasks.all())
@@ -648,6 +909,31 @@ def dashboard(request):
             Q(user=user) | Q(project__project_members__user=user)
         ).distinct().order_by('-timestamp')[:4]
     )
+    admin_snapshot = None
+    if (user.role or "").lower() == 'admin':
+        admin_snapshot = {
+            'projects': Project.objects.count(),
+            'users': Users.objects.count(),
+            'tasks': Task.objects.count(),
+            'memberships': ProjectMember.objects.count(),
+        }
+
+    timeline_projects = []
+    managed_timeline_qs = Project.objects.all() if (user.role or "").lower() == 'admin' else Project.objects.filter(manager=user)
+    for timeline_project in managed_timeline_qs.order_by('start_date', 'end_date')[:6]:
+        start_date = timeline_project.start_date
+        end_date = timeline_project.end_date or start_date
+        total_days = max((end_date - start_date).days, 1)
+        elapsed_days = (today_date - start_date).days
+        elapsed_percent = max(0, min(100, round((elapsed_days / total_days) * 100)))
+        timeline_projects.append({
+            'project': timeline_project,
+            'start_label': start_date.strftime('%b %d'),
+            'end_label': end_date.strftime('%b %d'),
+            'elapsed_percent': elapsed_percent,
+            'duration_days': total_days,
+        })
+
     team_members = []
     seen_memberships = set()
     for project in projects:
@@ -665,6 +951,11 @@ def dashboard(request):
         if len(team_members) >= 6:
             break
 
+    budget_visible_projects = [project for project in accessible_projects if can_view_project_budget(project, user)]
+    budget_rows, budget_total, budget_actual = build_budget_rows(budget_visible_projects[:6], user)
+    budget_remaining_total = budget_total - budget_actual
+    budget_usage_percent = min(100, round((budget_actual / budget_total) * 100)) if budget_total else 0
+
     context = build_dashboard_base_context(request, user)
     context.update({
         "greeting": greeting,
@@ -681,6 +972,14 @@ def dashboard(request):
         "upcoming_deadlines": upcoming_deadlines,
         "recent_activity": recent_activity,
         "team_members": team_members,
+        "admin_snapshot": admin_snapshot,
+        "dashboard_chart_data": [completed_tasks, in_progress_tasks, pending_tasks, overdue_tasks],
+        "timeline_projects": timeline_projects,
+        "dashboard_budget_rows": budget_rows[:4],
+        "dashboard_budget_total": budget_total,
+        "dashboard_budget_actual": budget_actual,
+        "dashboard_budget_remaining": budget_remaining_total,
+        "dashboard_budget_usage_percent": budget_usage_percent,
     })
 
     return render(request, 'dashboard/dashboard.html', context)
@@ -715,8 +1014,8 @@ def create_task(request):
     if not project:
         messages.error(request, 'Please select a valid project.')
         return redirect(next_url)
-    if not is_project_manager(project, user):
-        messages.error(request, 'Only the project manager can create tasks for this project.')
+    if not has_project_full_access(project, user):
+        messages.error(request, 'Only the project owner or manager can create tasks for this project.')
         return redirect(next_url)
 
     valid_priorities = {choice[0] for choice in Task.PRIORITY_CHOICES}
@@ -755,6 +1054,19 @@ def create_task(request):
             task=task,
         )
 
+        if assigned_user and assigned_user.id != user.id:
+            send_user_email_notification(
+                assigned_user,
+                f'New Task Assigned: {task.title}',
+                (
+                    f'Hi {assigned_user.display_name},\n\n'
+                    f'You have been assigned the task "{task.title}" in project "{project.name}".\n'
+                    f'Status: {task.get_status_display()}\n'
+                    f'Priority: {task.get_priority_display()}\n\n'
+                    'Please log in to Taskly to review the details.'
+                ),
+            )
+
         messages.success(request, 'Task created successfully.')
     except Exception as exc:
         logger.error(f"Task creation failed for user_id={user.id}: {exc}")
@@ -774,13 +1086,28 @@ def projects(request):
         return redirect('login')
 
     projects_qs = get_accessible_projects(user)
+    status_filter = request.GET.get('status', '').strip()
+    date_from = request.GET.get('date_from', '').strip()
+    date_to = request.GET.get('date_to', '').strip()
+
+    if status_filter in {choice[0] for choice in Project.STATUS_CHOICES}:
+        projects_qs = projects_qs.filter(status=status_filter)
+
+    if date_from:
+        projects_qs = projects_qs.filter(start_date__gte=date_from)
+
+    if date_to:
+        projects_qs = projects_qs.filter(
+            Q(end_date__lte=date_to) | Q(end_date__isnull=True, start_date__lte=date_to)
+        )
     project_cards = []
     for project in projects_qs:
         summary = build_project_summary(project)
         membership = get_project_membership(project, user)
         summary.update({
             'current_membership': membership,
-            'can_manage': is_project_manager(project, user),
+            'can_manage': has_project_full_access(project, user),
+            'can_view_budget': can_view_project_budget(project, user),
             'member_entries': [
                 build_member_entry(member, current_user_id=user.id)
                 for member in project.project_members.select_related('user').all()
@@ -788,7 +1115,8 @@ def projects(request):
         })
         project_cards.append(summary)
 
-    total_budget = projects_qs.aggregate(total=Sum('budget'))['total'] or 0
+    budget_visible_projects = [project for project in project_cards if project['can_view_budget']]
+    total_budget = sum((item['object'].budget or 0) for item in budget_visible_projects)
     status_counts = projects_qs.aggregate(
         total=Count('id'),
         in_progress=Count('id', filter=Q(status=Project.STATUS_IN_PROGRESS)),
@@ -802,7 +1130,13 @@ def projects(request):
         'projects': project_cards,
         'project_status_counts': status_counts,
         'project_total_budget': total_budget,
+        'active_project_filters': {
+            'status': status_filter,
+            'date_from': date_from,
+            'date_to': date_to,
+        },
         'team_options': Users.objects.exclude(id=user.id).order_by('first_name', 'last_name', 'username'),
+        'project_role_options': get_project_role_options(),
         'project_color_options': ['#4f7cff', '#7c5cfc', '#30d87d', '#ffb547', '#ff5470', '#00d4aa', '#e06030', '#8b5cf6'],
         'project_icon_options': ['globe', 'server', 'diagram-3', 'people', 'phone', 'bar-chart-line', 'shield-lock', 'lightning-charge', 'brush', 'gear'],
     })
@@ -857,6 +1191,259 @@ def tasks(request):
     return render(request, 'dashboard/tasks.html', context)
 
 
+def budget_tracking(request):
+    if not request.session.get('user_id'):
+        messages.warning(request, "Please login to continue.")
+        return redirect('login')
+
+    user = get_current_user(request)
+    if not user:
+        messages.error(request, "User not found.")
+        request.session.flush()
+        return redirect('login')
+
+    project = get_default_finance_project(user)
+    if not project:
+        messages.info(request, 'Create or join a project to use Budget Management.')
+        return redirect('projects')
+    return redirect('project_budget', project_id=project.id)
+
+
+def project_budget(request, project_id):
+    if not request.session.get('user_id'):
+        messages.warning(request, "Please login to continue.")
+        return redirect('login')
+
+    user = get_current_user(request)
+    if not user:
+        messages.error(request, "User not found.")
+        request.session.flush()
+        return redirect('login')
+
+    project = get_accessible_projects(user).filter(id=project_id).first()
+    if not project:
+        messages.error(request, 'Project budget not found.')
+        return redirect('projects')
+
+    is_owner_finance = can_manage_project_finances(project, user)
+    active_tab = request.GET.get('tab', 'all').strip() or 'all'
+    search_query = request.GET.get('search', '').strip()
+    status_filter = request.GET.get('status', '').strip()
+    date_from = request.GET.get('date_from', '').strip()
+    date_to = request.GET.get('date_to', '').strip()
+
+    transactions = Expense.objects.select_related(
+        'project',
+        'created_by',
+        'assigned_user',
+    ).filter(project=project).order_by('-issue_date', '-created_at')
+
+    if is_owner_finance:
+        if active_tab == 'salary':
+            transactions = transactions.filter(assigned_user__isnull=False)
+        elif active_tab in {Expense.TYPE_INCOME, Expense.TYPE_EXPENSE}:
+            transactions = transactions.filter(transaction_type=active_tab)
+
+        if search_query:
+            transactions = transactions.filter(
+                Q(title__icontains=search_query)
+                | Q(description__icontains=search_query)
+                | Q(reference_id__icontains=search_query)
+                | Q(assigned_user__first_name__icontains=search_query)
+                | Q(assigned_user__last_name__icontains=search_query)
+                | Q(assigned_user__username__icontains=search_query)
+                | Q(assigned_user__email__icontains=search_query)
+            )
+    else:
+        transactions = transactions.filter(assigned_user=user)
+        if active_tab not in {'all', 'paid', 'pending'}:
+            active_tab = 'all'
+        if active_tab == 'paid':
+            transactions = transactions.filter(status=Expense.STATUS_PAID)
+        elif active_tab == 'pending':
+            transactions = transactions.exclude(status=Expense.STATUS_PAID)
+
+        if search_query:
+            transactions = transactions.filter(
+                Q(title__icontains=search_query)
+                | Q(description__icontains=search_query)
+                | Q(reference_id__icontains=search_query)
+            )
+
+    if status_filter in {choice[0] for choice in Expense.PAYMENT_STATUS_CHOICES}:
+        transactions = transactions.filter(status=status_filter)
+
+    if date_from:
+        transactions = transactions.filter(issue_date__gte=date_from)
+
+    if date_to:
+        transactions = transactions.filter(issue_date__lte=date_to)
+
+    transaction_list = list(transactions)
+    finance_rows, finance_income_total, finance_expense_total, finance_salary_total, finance_net_total = build_finance_rows(transaction_list)
+    paid_count = sum(1 for item in finance_rows if item['status'] == Expense.STATUS_PAID)
+    overdue_count = sum(1 for item in finance_rows if item['status'] == Expense.STATUS_OVERDUE)
+    pending_count = sum(1 for item in finance_rows if item['status'] == Expense.STATUS_PENDING)
+
+    if is_owner_finance and request.GET.get('export') == 'csv':
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="taskly-budget-{project.id}.csv"'
+        response.write('Title,Kind,Category,Paid To,Reference ID,Issue Date,Paid Date,Status,Amount\r\n')
+        for item in finance_rows:
+            response.write(
+                f'"{item["title"]}","{item["entry_kind_label"]}","{item["category_name"]}","{item["assigned_user_name"]}","{item["reference_id"]}","{item["issue_date"] or ""}","{item["paid_date"] or ""}","{item["status_label"]}","{item["amount"]}"\r\n'
+            )
+        return response
+
+    expense_total = project.expenses.filter(transaction_type=Expense.TYPE_EXPENSE).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    income_total = project.expenses.filter(transaction_type=Expense.TYPE_INCOME).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    remaining_balance = (project.budget or Decimal('0')) + income_total - expense_total
+    budget_usage_percent = min(100, round((expense_total / project.budget) * 100)) if project.budget else 0
+    project_members = list(project.project_members.select_related('user').all())
+    owner_projects = list(get_budget_visible_projects(user)) if is_owner_finance else [project]
+    finance_project_member_map = {}
+    for finance_project in owner_projects:
+        finance_project_member_map[str(finance_project.id)] = [
+            {
+                'id': member.user.id,
+                'name': member.user.display_name,
+                'role': member.display_role,
+            }
+            for member in finance_project.project_members.select_related('user').all()
+            if not member.is_manager
+        ]
+
+    context = build_dashboard_base_context(request, user)
+    context.update({
+        'project': project,
+        'is_owner_finance': is_owner_finance,
+        'can_view_project_budget': can_view_project_budget(project, user),
+        'budget_total': project.budget or Decimal('0'),
+        'finance_income_total': finance_income_total if is_owner_finance else Decimal('0'),
+        'finance_expense_total': finance_expense_total if is_owner_finance else Decimal('0'),
+        'finance_salary_total': finance_salary_total,
+        'budget_remaining_total': remaining_balance,
+        'budget_usage_percent': budget_usage_percent,
+        'finance_rows': finance_rows,
+        'finance_transaction_count': len(finance_rows),
+        'finance_paid_count': paid_count,
+        'finance_pending_count': pending_count,
+        'finance_overdue_count': overdue_count,
+        'finance_active_tab': active_tab,
+        'finance_filters': {
+            'search': search_query,
+            'status': status_filter,
+            'date_from': date_from,
+            'date_to': date_to,
+        },
+        'finance_status_choices': Expense.PAYMENT_STATUS_CHOICES,
+        'finance_entry_kind_choices': FINANCE_ENTRY_KIND_CHOICES,
+        'finance_team_members': [member for member in project_members if not member.is_manager],
+        'finance_project_options': owner_projects,
+        'finance_project_member_map': finance_project_member_map,
+        'finance_transactions_url': get_project_budget_url(project),
+        'project_budget_income_total': income_total,
+        'project_budget_expense_total': expense_total,
+        'project_salary_latest_date': next((item['paid_date'] for item in finance_rows if item['paid_date']), None),
+        'project_budget_membership': get_project_membership(project, user),
+    })
+    return render(request, 'dashboard/budget_tracking.html', context)
+
+
+def employees(request):
+    if not request.session.get('user_id'):
+        messages.warning(request, "Please login to continue.")
+        return redirect('login')
+
+    user = get_current_user(request)
+    if not user:
+        messages.error(request, "User not found.")
+        request.session.flush()
+        return redirect('login')
+
+    search_query = request.GET.get('search', '').strip()
+    selected_employee_id = request.GET.get('employee', '').strip()
+    detail_tab = request.GET.get('detail_tab', 'projects').strip() or 'projects'
+    if detail_tab not in {'projects', 'details'}:
+        detail_tab = 'projects'
+
+    employee_users = Users.objects.all().order_by('first_name', 'last_name', 'username')
+    if search_query:
+        employee_users = employee_users.filter(
+            Q(first_name__icontains=search_query)
+            | Q(last_name__icontains=search_query)
+            | Q(username__icontains=search_query)
+            | Q(email__icontains=search_query)
+            | Q(role__icontains=search_query)
+        )
+
+    user_list = list(employee_users)
+    profiles = {profile.user_id: profile for profile in EmployeeProfile.objects.filter(user__in=user_list)}
+    employee_rows = []
+    for employee_user in user_list:
+        profile = profiles.get(employee_user.id) or ensure_employee_profile(employee_user)
+        employee_rows.append({
+            'user': employee_user,
+            'profile': profile,
+            'salary_display': profile.salary,
+            'status_badge_class': get_profile_badge_class(profile.status),
+        })
+
+    paginator = Paginator(employee_rows, 8)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    selected_employee = None
+
+    if selected_employee_id:
+        selected_employee = next((row for row in employee_rows if str(row['user'].id) == selected_employee_id), None)
+
+    if not selected_employee and page_obj.object_list:
+        selected_employee = page_obj.object_list[0]
+
+    assignment_rows = []
+    detail_profile = None
+
+    if selected_employee:
+        detail_profile = selected_employee['profile']
+        memberships = ProjectMember.objects.select_related('project').filter(user=selected_employee['user']).order_by('-assignment_start_date', '-joined_at')
+        for membership in memberships:
+            start_date = membership.assignment_start_date or membership.project.start_date
+            end_date = membership.assignment_end_date or membership.project.end_date
+            total_days = ''
+            if start_date and end_date:
+                total_days = max((end_date - start_date).days + 1, 1)
+            project_tasks = membership.project.tasks.count()
+            completed_tasks = membership.project.tasks.filter(status=Task.STATUS_COMPLETED).count()
+            progress = round((completed_tasks / project_tasks) * 100) if project_tasks else 0
+            assignment_rows.append({
+                'membership': membership,
+                'project': membership.project,
+                'progress': progress,
+                'status_label': (membership.assignment_status or 'active').replace('_', ' ').title(),
+                'status_badge_class': get_assignment_badge_class(membership.assignment_status),
+                'start_date': start_date,
+                'end_date': end_date,
+                'total_days': total_days,
+            })
+
+    context = build_dashboard_base_context(request, user)
+    context.update({
+        'employee_page_obj': page_obj,
+        'employee_search': search_query,
+        'selected_employee': selected_employee,
+        'employee_detail_tab': detail_tab,
+        'employee_assignment_rows': assignment_rows,
+        'employee_type_choices': EmployeeProfile.EMPLOYEE_TYPE_CHOICES,
+        'employee_status_choices': EmployeeProfile.EMPLOYMENT_STATUS_CHOICES,
+        'assignment_status_choices': [
+            ('active', 'Active'),
+            ('planned', 'Planned'),
+            ('on_hold', 'On Hold'),
+            ('completed', 'Completed'),
+        ],
+    })
+    return render(request, 'dashboard/employees.html', context)
+
+
 @require_POST
 @csrf_protect
 def update_project(request, project_id):
@@ -874,8 +1461,8 @@ def update_project(request, project_id):
     if not project:
         messages.error(request, 'Project not found.')
         return redirect('projects')
-    if not is_project_manager(project, user):
-        messages.error(request, 'Only the project manager can update this project.')
+    if not has_project_full_access(project, user):
+        messages.error(request, 'Only the project owner or manager can update this project.')
         return redirect('projects')
 
     name = request.POST.get('name', '').strip()
@@ -898,6 +1485,12 @@ def update_project(request, project_id):
     valid_statuses = {choice[0] for choice in Project.STATUS_CHOICES}
     if status not in valid_statuses:
         status = Project.STATUS_PLANNED
+    elif not can_transition_project_status(project.status, status):
+        messages.error(
+            request,
+            f'Project status can only move from {project.status_label} to a valid next stage.',
+        )
+        return redirect('projects')
 
     try:
         budget = Decimal(budget_raw)
@@ -947,15 +1540,15 @@ def manage_project_team(request, project_id):
     if not project:
         messages.error(request, 'Project not found.')
         return redirect('projects')
-    if not is_project_manager(project, user):
-        messages.error(request, 'Only the project manager can manage team members.')
+    if not has_project_full_access(project, user):
+        messages.error(request, 'Only the project owner or manager can manage team members.')
         return redirect('projects')
 
     selected_member_ids = {int(member_id) for member_id in request.POST.getlist('members') if member_id.isdigit()}
     selected_member_ids.add(project.manager_id or user.id)
     role_map = {}
     for member_id in selected_member_ids:
-        role_map[member_id] = normalize_membership_role(
+        role_map[member_id] = normalize_project_role_value(
             request.POST.get(f'role_{member_id}', ''),
             is_manager=member_id == (project.manager_id or user.id),
         )
@@ -1010,8 +1603,8 @@ def delete_project(request, project_id):
     if not project:
         messages.error(request, 'Project not found.')
         return redirect('projects')
-    if not is_project_manager(project, user):
-        messages.error(request, 'Only the project manager can delete this project.')
+    if not has_project_full_access(project, user):
+        messages.error(request, 'Only the project owner or manager can delete this project.')
         return redirect('projects')
 
     project_name = project.name
@@ -1032,7 +1625,7 @@ def project_board(request, project_id):
         request.session.flush()
         return redirect('login')
 
-    project = Project.objects.select_related('manager').prefetch_related(
+    project = Project.objects.select_related('manager', 'owner').prefetch_related(
         'tasks__assigned_to',
         'tasks__comments__user',
         'project_members__user',
@@ -1045,6 +1638,8 @@ def project_board(request, project_id):
     if not is_project_member(project, user):
         messages.error(request, 'You do not have access to this project.')
         return redirect('projects')
+
+    ensure_default_expense_categories(project)
 
     summary = build_project_summary(project)
     task_columns = {
@@ -1060,6 +1655,11 @@ def project_board(request, project_id):
         task_columns.setdefault(task.status, []).append(task)
 
     recent_activity = list(project.activity_logs.all().order_by('-timestamp')[:5])
+    project_files = list(project.files.select_related('uploaded_by').all()[:8])
+    can_view_budget = can_view_project_budget(project, user)
+    project_expenses = list(project.expenses.filter(transaction_type=Expense.TYPE_EXPENSE).order_by('-created_at')[:6]) if can_view_budget else []
+    total_actual_expenses = project.expenses.filter(transaction_type=Expense.TYPE_EXPENSE).aggregate(total=Sum('amount'))['total'] or Decimal('0') if can_view_budget else Decimal('0')
+    budget_remaining = project.budget - total_actual_expenses if can_view_budget else Decimal('0')
 
     context = build_dashboard_base_context(request, user)
     context.update({
@@ -1070,13 +1670,19 @@ def project_board(request, project_id):
             for member in project.project_members.select_related('user').all()
         ],
         'current_project_membership': get_project_membership(project, user),
-        'can_manage_project': is_project_manager(project, user),
+        'can_manage_project': has_project_full_access(project, user),
+        'can_view_project_budget': can_view_project_budget(project, user),
         'board_columns': [
             {'key': Task.STATUS_TODO, 'label': 'To Do', 'tasks': task_columns[Task.STATUS_TODO], 'icon': 'list-task'},
             {'key': Task.STATUS_IN_PROGRESS, 'label': 'In Progress', 'tasks': task_columns[Task.STATUS_IN_PROGRESS], 'icon': 'activity'},
             {'key': Task.STATUS_COMPLETED, 'label': 'Completed', 'tasks': task_columns[Task.STATUS_COMPLETED], 'icon': 'patch-check'},
         ],
         'project_recent_activity': recent_activity,
+        'project_files': project_files,
+        'project_expenses': project_expenses,
+        'project_actual_expenses': total_actual_expenses,
+        'project_budget_remaining': budget_remaining,
+        'project_budget_usage_percent': min(100, round((total_actual_expenses / project.budget) * 100)) if can_view_budget and project.budget else 0,
         'selected_task_project_id': project.id,
     })
     return render(request, 'dashboard/project_board.html', context)
@@ -1106,7 +1712,7 @@ def update_task_status(request, task_id):
             return JsonResponse({'success': False, 'message': 'You do not have access to this task.'}, status=403)
         messages.error(request, 'You do not have access to this task.')
         return redirect('projects')
-    if not is_project_manager(task.project, user) and task.assigned_to_id != user.id:
+    if not has_project_full_access(task.project, user) and task.assigned_to_id != user.id:
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({'success': False, 'message': 'Only the assignee or project manager can update this task.'}, status=403)
         messages.error(request, 'Only the assignee or project manager can update this task.')
@@ -1119,6 +1725,13 @@ def update_task_status(request, task_id):
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({'success': False, 'message': 'Invalid task status.'}, status=400)
         messages.error(request, 'Invalid task status.')
+        return redirect(next_url)
+
+    if not can_transition_task_status(task.status, new_status):
+        message = f'Task status cannot move directly from {task.get_status_display()} to {dict(Task.STATUS_CHOICES).get(new_status, new_status)}.'
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'message': message}, status=400)
+        messages.error(request, message)
         return redirect(next_url)
 
     if task.status != new_status:
@@ -1189,8 +1802,8 @@ def update_task(request, task_id):
     ).filter(id=task_id).first()
     if not task:
         return JsonResponse({'success': False, 'message': 'Task not found.'}, status=404)
-    if not is_project_manager(task.project, user):
-        return JsonResponse({'success': False, 'message': 'Only the project manager can edit task details.'}, status=403)
+    if not has_project_full_access(task.project, user):
+        return JsonResponse({'success': False, 'message': 'Only the project owner or manager can edit task details.'}, status=403)
 
     title = request.POST.get('title', '').strip()
     description = request.POST.get('description', '').strip()
@@ -1207,6 +1820,11 @@ def update_task(request, task_id):
 
     if status not in valid_statuses:
         return JsonResponse({'success': False, 'message': 'Invalid status.'}, status=400)
+    if not can_transition_task_status(task.status, status):
+        return JsonResponse({
+            'success': False,
+            'message': f'Task status cannot move directly from {task.get_status_display()} to {dict(Task.STATUS_CHOICES).get(status, status)}.',
+        }, status=400)
 
     if priority not in valid_priorities:
         return JsonResponse({'success': False, 'message': 'Invalid priority.'}, status=400)
@@ -1219,6 +1837,8 @@ def update_task(request, task_id):
         ).distinct().first()
         if not assigned_user:
             return JsonResponse({'success': False, 'message': 'Invalid assignee.'}, status=400)
+
+    previous_assigned_to_id = task.assigned_to_id
 
     task.title = title
     task.description = description or None
@@ -1234,6 +1854,19 @@ def update_task(request, task_id):
         project=task.project,
         task=task,
     )
+
+    if assigned_user and assigned_user.id != user.id and previous_assigned_to_id != assigned_user.id:
+        send_user_email_notification(
+            assigned_user,
+            f'Task Reassigned: {task.title}',
+            (
+                f'Hi {assigned_user.display_name},\n\n'
+                f'You have been assigned the task "{task.title}" in project "{task.project.name}".\n'
+                f'Status: {task.get_status_display()}\n'
+                f'Priority: {task.get_priority_display()}\n\n'
+                'Please log in to Taskly to review the latest changes.'
+            ),
+        )
 
     task.refresh_from_db()
     task = Task.objects.select_related('project', 'assigned_to').prefetch_related(
@@ -1272,6 +1905,29 @@ def add_task_comment(request, task_id):
         task=task,
     )
 
+    for mentioned_user in get_user_mentions(comment_text):
+        if mentioned_user.id == user.id:
+            continue
+        if not is_project_member(task.project, mentioned_user):
+            continue
+        ActivityLog.objects.create(
+            user=user,
+            action=f'mentioned @{mentioned_user.username} in a comment on "{task.title}"',
+            project=task.project,
+            task=task,
+        )
+        send_user_email_notification(
+            mentioned_user,
+            f'You were mentioned in {task.title}',
+            (
+                f'Hi {mentioned_user.display_name},\n\n'
+                f'{user.display_name} mentioned you in a comment on "{task.title}" '
+                f'for project "{task.project.name}".\n\n'
+                f'Comment:\n{comment_text}\n\n'
+                'Open Taskly to reply.'
+            ),
+        )
+
     return JsonResponse({
         'success': True,
         'message': 'Comment added.',
@@ -1301,8 +1957,8 @@ def delete_task(request, task_id):
     task = Task.objects.select_related('project').filter(id=task_id).first()
     if not task:
         return JsonResponse({'success': False, 'message': 'Task not found.'}, status=404)
-    if not is_project_manager(task.project, user):
-        return JsonResponse({'success': False, 'message': 'Only the project manager can delete this task.'}, status=403)
+    if not has_project_full_access(task.project, user):
+        return JsonResponse({'success': False, 'message': 'Only the project owner or manager can delete this task.'}, status=403)
 
     project_id = task.project_id
     task_title = task.title
@@ -1315,6 +1971,477 @@ def delete_task(request, task_id):
     )
 
     return JsonResponse({'success': True, 'message': 'Task deleted successfully.', 'project_id': project_id})
+
+
+@require_POST
+@csrf_protect
+def upload_project_file(request, project_id):
+    if not request.session.get('user_id'):
+        messages.warning(request, "Please login to continue.")
+        return redirect('login')
+
+    user = get_current_user(request)
+    if not user:
+        messages.error(request, "User not found.")
+        request.session.flush()
+        return redirect('login')
+
+    project = Project.objects.filter(id=project_id).first()
+    if not project or not is_project_member(project, user):
+        messages.error(request, 'You do not have access to this project.')
+        return redirect('projects')
+
+    uploaded_file = request.FILES.get('project_file')
+    next_view = request.POST.get('next', '').strip()
+    if not uploaded_file:
+        messages.error(request, 'Please choose a file to upload.')
+        return redirect(next_view or reverse('project_board', args=[project.id]))
+
+    project_files_dir = os.path.join(settings.MEDIA_ROOT, "project_files", str(project.id))
+    os.makedirs(project_files_dir, exist_ok=True)
+    safe_name = os.path.basename(uploaded_file.name or "file")
+    file_path = os.path.join(project_files_dir, safe_name)
+    relative_path = os.path.relpath(file_path, settings.MEDIA_ROOT).replace(os.sep, "/")
+
+    with open(file_path, "wb+") as destination:
+        for chunk in uploaded_file.chunks():
+            destination.write(chunk)
+
+    ProjectFile.objects.create(
+        project=project,
+        uploaded_by=user,
+        file=relative_path,
+    )
+    ActivityLog.objects.create(
+        user=user,
+        action=f'uploaded file "{safe_name}"',
+        project=project,
+    )
+    messages.success(request, 'Project file uploaded successfully.')
+    return redirect(next_view or reverse('project_board', args=[project.id]))
+
+
+def download_project_file(request, file_id):
+    if not request.session.get('user_id'):
+        messages.warning(request, "Please login to continue.")
+        return redirect('login')
+
+    user = get_current_user(request)
+    if not user:
+        messages.error(request, "User not found.")
+        request.session.flush()
+        return redirect('login')
+
+    project_file = ProjectFile.objects.select_related('project').filter(id=file_id).first()
+    if not project_file or not is_project_member(project_file.project, user):
+        raise Http404("File not found.")
+
+    absolute_path = get_project_file_absolute_path(project_file)
+    if not os.path.exists(absolute_path):
+        raise Http404("File not found.")
+
+    return FileResponse(open(absolute_path, "rb"), as_attachment=True, filename=os.path.basename(absolute_path))
+
+
+@require_POST
+@csrf_protect
+def add_project_expense(request, project_id):
+    if not request.session.get('user_id'):
+        messages.warning(request, "Please login to continue.")
+        return redirect('login')
+
+    user = get_current_user(request)
+    if not user:
+        messages.error(request, "User not found.")
+        request.session.flush()
+        return redirect('login')
+
+    project = Project.objects.filter(id=project_id).first()
+    if not project or not can_manage_project_finances(project, user):
+        messages.error(request, 'Only the project owner can add expenses.')
+        return redirect('projects')
+
+    next_view = request.POST.get('next', '').strip()
+    description = request.POST.get('description', '').strip()
+    amount_raw = request.POST.get('amount', '').strip()
+    category_id = request.POST.get('category', '').strip()
+    if not description or not amount_raw or not category_id:
+        messages.error(request, 'Expense category, description, and amount are required.')
+        return redirect(next_view or get_project_budget_url(project))
+
+    try:
+        amount = Decimal(amount_raw)
+        if amount <= 0:
+            raise InvalidOperation
+    except (InvalidOperation, TypeError):
+        messages.error(request, 'Expense amount must be a valid positive number.')
+        return redirect(next_view or get_project_budget_url(project))
+
+    category = ExpenseCategory.objects.filter(id=category_id, project=project).first()
+    if not category:
+        messages.error(request, 'Please choose a valid expense category.')
+        return redirect(next_view or get_project_budget_url(project))
+
+    Expense.objects.create(
+        project=project,
+        category=category,
+        created_by=user,
+        title=description,
+        description=description,
+        amount=amount,
+        transaction_type=Expense.TYPE_EXPENSE,
+        status=Expense.STATUS_PAID,
+        issue_date=timezone.localdate(),
+        paid_date=timezone.localdate(),
+    )
+    ActivityLog.objects.create(
+        user=user,
+        action=f'logged expense "{description}" under {category.name}',
+        project=project,
+    )
+    messages.success(request, 'Expense added successfully.')
+    return redirect(next_view or get_project_budget_url(project))
+
+
+@require_POST
+@csrf_protect
+def create_expense_category(request, project_id):
+    if not request.session.get('user_id'):
+        messages.warning(request, "Please login to continue.")
+        return redirect('login')
+
+    user = get_current_user(request)
+    if not user:
+        messages.error(request, "User not found.")
+        request.session.flush()
+        return redirect('login')
+
+    project = Project.objects.filter(id=project_id).first()
+    if not project or not can_manage_project_finances(project, user):
+        messages.error(request, 'Only the project owner can create expense categories.')
+        return redirect('projects')
+
+    next_view = request.POST.get('next', '').strip()
+    category_name = normalize_category_name(request.POST.get('name', ''))
+    if not category_name:
+        messages.error(request, 'Category name is required.')
+        return redirect(next_view or get_project_budget_url(project))
+
+    category, created = ExpenseCategory.objects.get_or_create(
+        project=project,
+        name=category_name,
+        defaults={'created_by': user, 'is_fixed': False},
+    )
+    if created:
+        ActivityLog.objects.create(
+            user=user,
+            action=f'created expense category "{category.name}"',
+            project=project,
+        )
+        messages.success(request, 'Expense category created successfully.')
+    else:
+        messages.info(request, 'That expense category already exists.')
+
+    return redirect(next_view or get_project_budget_url(project))
+
+
+@require_POST
+@csrf_protect
+def create_finance_transaction(request):
+    if not request.session.get('user_id'):
+        messages.warning(request, "Please login to continue.")
+        return redirect('login')
+
+    user = get_current_user(request)
+    if not user:
+        messages.error(request, "User not found.")
+        request.session.flush()
+        return redirect('login')
+
+    next_view = request.POST.get('next', '').strip()
+    title = request.POST.get('title', '').strip()
+    project_id = request.POST.get('project', '').strip()
+    entry_kind = request.POST.get('entry_kind', 'expense').strip()
+    assigned_user_id = request.POST.get('assigned_user', '').strip()
+    amount_raw = request.POST.get('amount', '').strip()
+    status = request.POST.get('status', Expense.STATUS_PENDING).strip()
+    issue_date = request.POST.get('issue_date', '').strip()
+    paid_date = request.POST.get('paid_date', '').strip()
+    reference_id = request.POST.get('reference_id', '').strip()
+    description = request.POST.get('description', '').strip()
+
+    project = get_accessible_projects(user).filter(id=project_id).first()
+    if not project:
+        messages.error(request, 'Please choose a valid project.')
+        return redirect(next_view or reverse('projects'))
+    if not can_manage_project_finances(project, user):
+        messages.error(request, 'Only the project owner can add transactions.')
+        return redirect(next_view or get_project_budget_url(project))
+    if not next_view:
+        next_view = get_project_budget_url(project)
+
+    if not title:
+        messages.error(request, 'Transaction title is required.')
+        return redirect(next_view)
+
+    try:
+        amount = Decimal(amount_raw)
+        if amount <= 0:
+            raise InvalidOperation
+    except (InvalidOperation, TypeError):
+        messages.error(request, 'Amount must be a valid positive number.')
+        return redirect(next_view)
+
+    valid_statuses = {choice[0] for choice in Expense.PAYMENT_STATUS_CHOICES}
+    if status not in valid_statuses:
+        status = Expense.STATUS_PENDING
+
+    assigned_user = None
+    transaction_type = Expense.TYPE_EXPENSE
+    if entry_kind == 'salary':
+        assigned_user = Users.objects.filter(id=assigned_user_id, project_memberships__project=project).distinct().first()
+        if not assigned_user:
+            messages.error(request, 'Please choose a valid team member for the salary payment.')
+            return redirect(next_view)
+    else:
+        transaction_type = Expense.TYPE_INCOME if entry_kind == 'income' else Expense.TYPE_EXPENSE
+
+    Expense.objects.create(
+        project=project,
+        category=None,
+        created_by=user,
+        assigned_user=assigned_user,
+        amount=amount,
+        title=title,
+        description=description or title,
+        transaction_type=transaction_type,
+        reference_id=reference_id or None,
+        status=status,
+        issue_date=parse_date(issue_date) if issue_date else None,
+        paid_date=parse_date(paid_date) if paid_date else None,
+        note=description or None,
+    )
+    ActivityLog.objects.create(
+        user=user,
+        action=f'added a {"salary payment" if entry_kind == "salary" else entry_kind} transaction for "{project.name}"',
+        project=project,
+    )
+    messages.success(request, 'Transaction saved successfully.')
+    return redirect(next_view)
+
+
+@require_POST
+@csrf_protect
+def update_finance_transaction(request, transaction_id):
+    if not request.session.get('user_id'):
+        messages.warning(request, "Please login to continue.")
+        return redirect('login')
+
+    user = get_current_user(request)
+    if not user:
+        messages.error(request, "User not found.")
+        request.session.flush()
+        return redirect('login')
+
+    transaction = Expense.objects.select_related('project', 'assigned_user').filter(id=transaction_id).first()
+    if not transaction or not can_manage_project_finances(transaction.project, user):
+        messages.error(request, 'Transaction not found.')
+        return redirect('projects')
+    project_id = request.POST.get('project', '').strip()
+    target_project = get_accessible_projects(user).filter(id=project_id).first() if project_id else transaction.project
+    if not target_project or not can_manage_project_finances(target_project, user):
+        messages.error(request, 'Please choose a valid project.')
+        return redirect(get_project_budget_url(transaction.project))
+    next_view = request.POST.get('next', '').strip() or get_project_budget_url(target_project)
+    title = request.POST.get('title', '').strip()
+    entry_kind = request.POST.get(
+        'entry_kind',
+        'salary' if transaction.is_salary_payment else ('income' if transaction.transaction_type == Expense.TYPE_INCOME else 'expense'),
+    ).strip()
+    amount_raw = request.POST.get('amount', '').strip()
+    status = request.POST.get('status', transaction.status).strip()
+    issue_date = request.POST.get('issue_date', '').strip()
+    paid_date = request.POST.get('paid_date', '').strip()
+    reference_id = request.POST.get('reference_id', '').strip()
+    description = request.POST.get('description', '').strip()
+    assigned_user_id = request.POST.get('assigned_user', '').strip()
+
+    if not title:
+        messages.error(request, 'Transaction title is required.')
+        return redirect(next_view)
+
+    try:
+        amount = Decimal(amount_raw)
+        if amount <= 0:
+            raise InvalidOperation
+    except (InvalidOperation, TypeError):
+        messages.error(request, 'Amount must be a valid positive number.')
+        return redirect(next_view)
+
+    assigned_user = None
+    if entry_kind == 'salary':
+        assigned_user = Users.objects.filter(id=assigned_user_id, project_memberships__project=target_project).distinct().first()
+        if not assigned_user:
+            messages.error(request, 'Please choose a valid team member for the salary payment.')
+            return redirect(next_view)
+        transaction_type = Expense.TYPE_EXPENSE
+    else:
+        transaction_type = Expense.TYPE_INCOME if entry_kind == 'income' else Expense.TYPE_EXPENSE
+
+    transaction.project = target_project
+    transaction.title = title
+    transaction.description = description or title
+    transaction.note = description or None
+    transaction.transaction_type = transaction_type
+    transaction.amount = amount
+    transaction.status = status if status in {choice[0] for choice in Expense.PAYMENT_STATUS_CHOICES} else Expense.STATUS_PENDING
+    transaction.issue_date = parse_date(issue_date) if issue_date else None
+    transaction.paid_date = parse_date(paid_date) if paid_date else None
+    transaction.reference_id = reference_id or None
+    transaction.category = None
+    transaction.assigned_user = assigned_user
+    transaction.save()
+
+    ActivityLog.objects.create(
+        user=user,
+        action=f'updated finance transaction "{transaction.display_title}"',
+        project=transaction.project,
+    )
+    messages.success(request, 'Transaction updated successfully.')
+    return redirect(next_view)
+
+
+@require_POST
+@csrf_protect
+def create_employee(request):
+    if not request.session.get('user_id'):
+        messages.warning(request, "Please login to continue.")
+        return redirect('login')
+
+    current_user = get_current_user(request)
+    if not current_user:
+        messages.error(request, "User not found.")
+        request.session.flush()
+        return redirect('login')
+
+    first_name = request.POST.get('first_name', '').strip()
+    last_name = request.POST.get('last_name', '').strip()
+    username = request.POST.get('username', '').strip()
+    email = request.POST.get('email', '').strip().lower()
+    role = request.POST.get('role', '').strip() or 'employee'
+    employee_type = request.POST.get('employee_type', EmployeeProfile.TYPE_FULL_TIME).strip()
+    salary_raw = request.POST.get('salary', '').strip() or '0'
+    join_date = request.POST.get('join_date', '').strip()
+    status = request.POST.get('status', EmployeeProfile.STATUS_ACTIVE).strip()
+    password = request.POST.get('password', '').strip() or 'taskly123'
+
+    if not all([first_name, last_name, username, email]):
+        messages.error(request, 'First name, last name, username, and email are required.')
+        return redirect('employees')
+
+    if Users.objects.filter(email__iexact=email).exists():
+        messages.error(request, 'That email is already registered.')
+        return redirect('employees')
+
+    if Users.objects.filter(username__iexact=username).exists():
+        messages.error(request, 'That username is already taken.')
+        return redirect('employees')
+
+    try:
+        salary = Decimal(salary_raw)
+        if salary < 0:
+            raise InvalidOperation
+    except (InvalidOperation, TypeError):
+        messages.error(request, 'Salary must be a valid positive amount.')
+        return redirect('employees')
+
+    employee = Users(
+        first_name=first_name,
+        last_name=last_name,
+        username=username,
+        email=email,
+        role=role,
+        created_at=timezone.now(),
+    )
+    employee.set_password(password)
+    employee.save()
+
+    profile = EmployeeProfile.objects.create(
+        user=employee,
+        employee_type=employee_type if employee_type in {choice[0] for choice in EmployeeProfile.EMPLOYEE_TYPE_CHOICES} else EmployeeProfile.TYPE_FULL_TIME,
+        salary=salary,
+        join_date=parse_date(join_date) if join_date else timezone.localdate(),
+        status=status if status in {choice[0] for choice in EmployeeProfile.EMPLOYMENT_STATUS_CHOICES} else EmployeeProfile.STATUS_ACTIVE,
+    )
+    EmployeePayroll.objects.create(
+        employee=profile,
+        month=date(timezone.localdate().year, timezone.localdate().month, 1),
+        base_salary=salary,
+        bonus=Decimal('0'),
+        deduction=Decimal('0'),
+        payment_status=EmployeePayroll.STATUS_PENDING,
+    )
+    ActivityLog.objects.create(
+        user=current_user,
+        action=f'added employee "{employee.display_name}"',
+    )
+    messages.success(request, 'Employee added successfully.')
+    return redirect(f"{reverse('employees')}?employee={employee.id}")
+
+
+@require_POST
+@csrf_protect
+def assign_employee_project(request):
+    if not request.session.get('user_id'):
+        messages.warning(request, "Please login to continue.")
+        return redirect('login')
+
+    current_user = get_current_user(request)
+    if not current_user:
+        messages.error(request, "User not found.")
+        request.session.flush()
+        return redirect('login')
+
+    employee_id = request.POST.get('employee', '').strip()
+    project_id = request.POST.get('project', '').strip()
+    assignment_status = request.POST.get('assignment_status', 'active').strip() or 'active'
+    start_date = request.POST.get('start_date', '').strip()
+    end_date = request.POST.get('end_date', '').strip()
+    description = request.POST.get('description', '').strip()
+
+    employee = Users.objects.filter(id=employee_id).first()
+    project = get_accessible_projects(current_user).filter(id=project_id).first()
+    if not employee or not project:
+        messages.error(request, 'Please select a valid employee and project.')
+        return redirect('employees')
+    membership, created = ProjectMember.objects.get_or_create(
+        project=project,
+        user=employee,
+        defaults={
+            'role': employee.role.title() if employee.role else 'Team Member',
+        },
+    )
+    membership.assignment_status = assignment_status
+    try:
+        hours_per_day = Decimal(request.POST.get('allocation_hours_per_day', '').strip() or '0')
+        if hours_per_day < 0:
+            raise InvalidOperation
+    except (InvalidOperation, TypeError):
+        messages.error(request, 'Time allocated must be a valid number.')
+        return redirect(f"{reverse('employees')}?employee={employee.id}")
+    membership.allocation_hours_per_day = hours_per_day
+    membership.assignment_start_date = parse_date(start_date) if start_date else project.start_date
+    membership.assignment_end_date = parse_date(end_date) if end_date else project.end_date
+    membership.assignment_notes = description or None
+    membership.save()
+
+    ActivityLog.objects.create(
+        user=current_user,
+        action=f'{"assigned" if created else "updated assignment for"} "{employee.display_name}" on "{project.name}"',
+        project=project,
+    )
+    messages.success(request, 'Project assignment saved successfully.')
+    return redirect(f"{reverse('employees')}?employee={employee.id}&detail_tab=projects")
 
 @require_POST
 @csrf_protect
@@ -1372,6 +2499,7 @@ def create_project(request):
             start_date=start_date,
             end_date=end_date,
             budget=budget,
+            owner=user,
             manager=user,
             status=status,
             color=color,
@@ -1380,6 +2508,7 @@ def create_project(request):
 
         member_queryset = Users.objects.filter(id__in=member_ids).distinct()
         sync_project_manager_membership(project, user)
+        ensure_default_expense_categories(project, user)
 
         existing_member_ids = {user.id}
         for member in member_queryset:
@@ -1388,7 +2517,7 @@ def create_project(request):
             ProjectMember.objects.create(
                 project=project,
                 user=member,
-                role=normalize_membership_role(request.POST.get(f'role_{member.id}', '')),
+                role=normalize_project_role_value(request.POST.get(f'role_{member.id}', '')),
                 is_manager=False,
             )
             existing_member_ids.add(member.id)

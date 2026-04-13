@@ -3,251 +3,333 @@
 {% block title %}Projects - Taskly{% endblock %}
 
 {% block dashboard_content %}
-<div class="main-area">
-    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
-        <div>
-            <h4 style="font-weight:800;font-size:1.25rem;margin-bottom:4px;">All
-                Projects</h4>
-            <p style="color:var(--muted);font-size:13px;margin:0;">
-                Manage and track all your team's projects in one place.
-            </p>
-        </div>
-        <button class="btn-primary-custom d-flex align-items-center gap-2" data-bs-toggle="modal"
-            data-bs-target="#newProjectModal">
-            <i class="bi bi-plus-lg"></i> New Project
-        </button>
-    </div>
-
-    <div class="projects-stats">
-        <div class="pstat-card">
-            <div class="pstat-icon blue"><i class="bi bi-folder2"></i></div>
+<div class="main-area workspace-page">
+    <section class="workspace-shell">
+        <div class="workspace-shell-header">
             <div>
-                <div class="pstat-num">{{ project_status_counts.total }}</div>
-                <div class="pstat-label">Total Projects</div>
-            </div>
-        </div>
-        <div class="pstat-card">
-            <div class="pstat-icon purple"><i class="bi bi-activity"></i></div>
-            <div>
-                <div class="pstat-num">{{ project_status_counts.in_progress }}</div>
-                <div class="pstat-label">In Progress</div>
-            </div>
-        </div>
-        <div class="pstat-card">
-            <div class="pstat-icon green"><i class="bi bi-patch-check"></i></div>
-            <div>
-                <div class="pstat-num">{{ project_status_counts.completed }}</div>
-                <div class="pstat-label">Completed</div>
-            </div>
-        </div>
-        <div class="pstat-card">
-            <div class="pstat-icon yellow"><i class="bi bi-currency-dollar"></i></div>
-            <div>
-                <div class="pstat-num">${{ project_total_budget }}</div>
-                <div class="pstat-label">Total Budget</div>
-            </div>
-        </div>
-    </div>
-
-    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
-        <div class="filter-bar">
-            <button class="filter-pill active" data-filter="all">
-                All <span class="pill-count">{{ project_status_counts.total }}</span>
-            </button>
-            <button class="filter-pill" data-filter="in_progress">
-                In Progress <span class="pill-count">{{ project_status_counts.in_progress }}</span>
-            </button>
-            <button class="filter-pill" data-filter="planned">
-                Planned <span class="pill-count">{{ project_status_counts.planned }}</span>
-            </button>
-            <button class="filter-pill" data-filter="completed">
-                Completed <span class="pill-count">{{ project_status_counts.completed }}</span>
-            </button>
-            <button class="filter-pill" data-filter="on_hold">
-                On Hold <span class="pill-count">{{ project_status_counts.on_hold }}</span>
-            </button>
-        </div>
-    </div>
-
-    <div class="projects-grid" id="gridView">
-        {% for item in projects %}
-        <article class="project-card project-card-shell" data-status="{{ item.object.status }}"
-            data-name="{{ item.object.name|lower }}">
-            <a href="{% url 'project_board' item.object.id %}" class="project-card-link">
-                <div class="project-card-strip" data-gradient-start="{{ item.object.color }}"></div>
-                <div class="project-card-body">
-                    <div class="project-card-top">
-                        <div class="d-flex gap-3 align-items-start">
-                            <div class="project-icon-wrap" style="background:rgba(79,124,255,0.12);color:var(--accent);">
-                                <i class="bi bi-{{ item.object.icon }}"></i>
-                            </div>
-                            <div>
-                                <div class="project-name">{{ item.object.name }}</div>
-                                <div class="project-desc">{{ item.object.description|default:"No description added yet." }}</div>
-                            </div>
-                        </div>
-                        {% if item.can_manage %}
-                        <div class="dropdown project-card-menu">
-                            <button type="button" class="proj-menu-btn" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-three-dots-vertical"></i>
-                            </button>
-                            <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark-custom board-task-dropdown">
-                                <li><button type="button" class="dropdown-item project-edit-trigger"
-                                        data-project-id="{{ item.object.id }}"
-                                        data-project-name="{{ item.object.name }}"
-                                        data-project-description="{{ item.object.description|default:'' }}"
-                                        data-project-status="{{ item.object.status }}"
-                                        data-project-budget="{{ item.object.budget }}"
-                                        data-project-start="{{ item.object.start_date|date:'Y-m-d' }}"
-                                        data-project-end="{% if item.object.end_date %}{{ item.object.end_date|date:'Y-m-d' }}{% endif %}"
-                                        data-project-color="{{ item.object.color }}"
-                                        data-project-icon="{{ item.object.icon }}"><i class="bi bi-pencil"></i> Edit
-                                        Project</button></li>
-                                <li><button type="button" class="dropdown-item project-team-trigger"
-                                        data-project-id="{{ item.object.id }}"
-                                        data-project-name="{{ item.object.name }}"
-                                        data-project-members="{% for member in item.object.project_members.all %}{{ member.user.id }}{% if not forloop.last %},{% endif %}{% endfor %}"
-                                        data-project-roles="{% for member in item.object.project_members.all %}{{ member.user.id }}:{{ member.display_role }}{% if not forloop.last %}|{% endif %}{% endfor %}"><i
-                                            class="bi bi-people"></i> Manage Team</button></li>
-                                <li>
-                                    <hr class="dropdown-divider">
-                                </li>
-                                <li><button type="button" class="dropdown-item text-danger project-delete-trigger"
-                                        data-project-id="{{ item.object.id }}"
-                                        data-project-name="{{ item.object.name }}"><i class="bi bi-trash"></i> Delete
-                                        Project</button></li>
-                            </ul>
-                        </div>
-                        {% endif %}
-                    </div>
-                    <span class="proj-status {{ item.object.status }}">{{ item.object.status_label }}</span>
-                    <div class="project-progress">
-                        <div class="progress-header">
-                            <span>Progress</span>
-                            <strong>{{ item.progress }}%</strong>
-                        </div>
-                        <div class="progress-track">
-                            <div class="progress-fill" data-progress-width="{{ item.progress }}"
-                                data-gradient-start="{{ item.object.color }}">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="project-meta">
-                        <div class="project-meta-item"><i class="bi bi-check2-circle"></i> {{ item.completed_tasks }}/{{ item.total_tasks }} tasks</div>
-                        <div class="project-meta-item"><i class="bi bi-calendar3"></i> {% if item.object.end_date %}{{ item.object.end_date|date:"M d, Y" }}{% else %}No deadline{% endif %}</div>
-                    </div>
+                <div class="board-breadcrumb">
+                    <a href="{% url 'dashboard' %}">Dashboard</a>
+                    <span>/</span>
+                    <span>Projects</span>
                 </div>
-                <div class="project-card-footer">
-                    <div class="proj-team member-stack">
-                        {% for member in item.members %}
-                        <div class="member-avatar-shell">
-                            <div class="proj-ava" style="background:var(--accent);" data-avatar-user-id="{{ member.user.id }}" data-avatar-initials="{{ member.user.initials }}">{% if member.user.avatar_url %}<img src="{{ member.user.avatar_url }}" alt="{{ member.user.display_name }}" class="avatar-media avatar-media-cover">{% else %}{{ member.user.initials }}{% endif %}</div>
-                            <div class="member-hover-card">
-                                <div class="member-hover-name">{{ member.user.display_name }}</div>
-                                <div class="member-hover-role">{{ member.role }}</div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                        {% if item.extra_members %}
-                        <div class="proj-ava-more">+{{ item.extra_members }}</div>
-                        {% endif %}
+                <div class="workspace-heading-row">
+                    <div class="workspace-heading-copy">
+                        <span class="workspace-kicker">Project Directory</span>
+                        <h1 class="workspace-title">Projects</h1>
+                        <p class="workspace-copy">Track active delivery, team allocation, and budget health across every project in one cleaner workspace.</p>
                     </div>
-                    <div class="proj-budget"><i class="bi bi-cash-stack"></i> ${{ item.object.budget }}</div>
+                    <button class="btn-primary-custom workspace-action-btn d-flex align-items-center gap-2" data-bs-toggle="modal"
+                        data-bs-target="#newProjectModal">
+                        <i class="bi bi-plus-lg"></i> Add Project
+                    </button>
                 </div>
-            </a>
-        </article>
-        {% empty %}
-        <p style="margin:0;color:var(--muted);font-size:13px;">No projects available yet.</p>
-        {% endfor %}
-    </div>
+            </div>
+        </div>
 
-    <div class="empty-state" id="emptyState" style="display:none;">
-        <div class="empty-icon"><i class="bi bi-folder2-open"></i></div>
-        <div class="empty-title">No projects found</div>
-        <p class="empty-sub">Try a different filter or create a new project.</p>
-    </div>
+        <div class="workspace-stat-grid">
+            <article class="workspace-stat-card">
+                <span class="workspace-stat-label">All Projects</span>
+                <strong class="workspace-stat-value">{{ project_status_counts.total }}</strong>
+                <span class="workspace-stat-foot">Accessible in your workspace</span>
+            </article>
+            <article class="workspace-stat-card">
+                <span class="workspace-stat-label">In Progress</span>
+                <strong class="workspace-stat-value">{{ project_status_counts.in_progress }}</strong>
+                <span class="workspace-stat-foot">Active delivery right now</span>
+            </article>
+            <article class="workspace-stat-card">
+                <span class="workspace-stat-label">Completed</span>
+                <strong class="workspace-stat-value">{{ project_status_counts.completed }}</strong>
+                <span class="workspace-stat-foot">Closed and delivered</span>
+            </article>
+            <article class="workspace-stat-card">
+                <span class="workspace-stat-label">On Hold</span>
+                <strong class="workspace-stat-value">{{ project_status_counts.on_hold }}</strong>
+                <span class="workspace-stat-foot">Projects waiting on progress</span>
+            </article>
+        </div>
+
+        <section class="workspace-panel">
+            <div class="workspace-panel-head">
+                <div>
+                    <div class="workspace-panel-title-row">
+                        <h2 class="workspace-panel-title">Project List</h2>
+                        <span class="workspace-panel-count">{{ project_status_counts.total }}</span>
+                    </div>
+                    <p class="workspace-panel-copy">A structured view of project status, owners, progress, and budget performance.</p>
+                </div>
+                <div class="workspace-view-actions">
+                    <button type="button" class="workspace-view-chip active">
+                        <i class="bi bi-table"></i> List View
+                    </button>
+                </div>
+            </div>
+
+            <div class="workspace-toolbar">
+                <div class="filter-bar workspace-tabs">
+                    <button class="filter-pill active" data-filter="all">
+                        All <span class="pill-count">{{ project_status_counts.total }}</span>
+                    </button>
+                    <button class="filter-pill" data-filter="in_progress">
+                        Ongoing <span class="pill-count">{{ project_status_counts.in_progress }}</span>
+                    </button>
+                    <button class="filter-pill" data-filter="completed">
+                        Completed <span class="pill-count">{{ project_status_counts.completed }}</span>
+                    </button>
+                    <button class="filter-pill" data-filter="on_hold">
+                        On Hold <span class="pill-count">{{ project_status_counts.on_hold }}</span>
+                    </button>
+                </div>
+
+                <div class="workspace-toolbar-actions">
+                    <div class="workspace-search">
+                        <i class="bi bi-search"></i>
+                        <input type="search" id="projectListSearch" class="form-control" placeholder="Search projects, managers, or members">
+                    </div>
+                    <form method="get" class="projects-filter-form workspace-filter-form">
+                        <select class="form-select" name="status" aria-label="Filter by status">
+                            <option value="">All statuses</option>
+                            <option value="planned" {% if active_project_filters.status == 'planned' %}selected{% endif %}>Planned</option>
+                            <option value="in_progress" {% if active_project_filters.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                            <option value="completed" {% if active_project_filters.status == 'completed' %}selected{% endif %}>Completed</option>
+                            <option value="on_hold" {% if active_project_filters.status == 'on_hold' %}selected{% endif %}>On Hold</option>
+                        </select>
+                        <input type="date" class="form-control" name="date_from" value="{{ active_project_filters.date_from }}" aria-label="Start date from">
+                        <input type="date" class="form-control" name="date_to" value="{{ active_project_filters.date_to }}" aria-label="End date to">
+                        <button type="submit" class="btn-ghost">Filter</button>
+                        <a href="{% url 'projects' %}" class="btn-ghost">Reset</a>
+                    </form>
+                </div>
+            </div>
+
+            <div class="workspace-table-shell project-directory-table-shell">
+                <div class="workspace-table-scroll">
+                    <table class="workspace-table project-directory-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Manager</th>
+                                <th>Status</th>
+                                <th>Team</th>
+                                <th>Milestone</th>
+                                <th>Timeline</th>
+                                <th>Budget</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="gridView">
+                            {% for item in projects %}
+                            <tr class="workspace-project-row project-directory-row"
+                                data-project-row
+                                data-status="{{ item.object.status }}"
+                                data-name="{{ item.object.name|lower }} {{ item.object.description|default:''|lower }} {{ item.object.manager.display_name|default:''|lower }} {% for member in item.members %}{{ member.user.display_name|lower }} {% endfor %}">
+                                <td>
+                                    <a href="{% url 'project_board' item.object.id %}" class="workspace-project-main">
+                                        <span class="workspace-project-icon" data-inline-bg="rgba(79,124,255,0.12)">
+                                            <i class="bi bi-{{ item.object.icon }}"></i>
+                                        </span>
+                                        <span class="workspace-project-copy">
+                                            <span class="workspace-project-name">{{ item.object.name }}</span>
+                                            <span class="workspace-project-sub">{{ item.object.description|default:"No description added yet." }}</span>
+                                        </span>
+                                    </a>
+                                </td>
+                                <td>
+                                    {% if item.object.manager %}
+                                    <div class="workspace-person">
+                                        <span class="proj-ava workspace-person-avatar" data-avatar-user-id="{{ item.object.manager.id }}" data-avatar-initials="{{ item.object.manager.initials }}">
+                                            {% if item.object.manager.avatar_url %}<img src="{{ item.object.manager.avatar_url }}" alt="{{ item.object.manager.display_name }}" class="avatar-media avatar-media-cover">{% else %}{{ item.object.manager.initials }}{% endif %}
+                                        </span>
+                                        <span>
+                                            <span class="workspace-person-name">{{ item.object.manager.display_name }}</span>
+                                            <span class="workspace-person-sub">Project Manager</span>
+                                        </span>
+                                    </div>
+                                    {% else %}
+                                    <span class="workspace-project-sub">Unassigned</span>
+                                    {% endif %}
+                                </td>
+                                <td><span class="proj-status {{ item.object.status }}">{{ item.object.status_label }}</span></td>
+                                <td>
+                                    <div class="workspace-team-stack member-stack">
+                                        {% for member in item.members %}
+                                        <div class="member-avatar-shell">
+                                            <div class="proj-ava" data-avatar-user-id="{{ member.user.id }}" data-avatar-initials="{{ member.user.initials }}">
+                                                {% if member.user.avatar_url %}<img src="{{ member.user.avatar_url }}" alt="{{ member.user.display_name }}" class="avatar-media avatar-media-cover">{% else %}{{ member.user.initials }}{% endif %}
+                                            </div>
+                                            <div class="member-hover-card">
+                                                <div class="member-hover-name">{{ member.user.display_name }}</div>
+                                                <div class="member-hover-role">{{ member.role }}</div>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                        {% if item.extra_members %}<div class="proj-ava-more">+{{ item.extra_members }}</div>{% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="workspace-progress-cell">
+                                        <div class="list-progress-label">
+                                            <span>{{ item.completed_tasks }}/{{ item.total_tasks }} tasks</span>
+                                            <strong>{{ item.progress }}%</strong>
+                                        </div>
+                                        <div class="list-progress-track">
+                                            <div class="list-progress-fill" data-progress-width="{{ item.progress }}" data-gradient-start="{{ item.object.color }}"></div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="workspace-date-range">
+                                        <span>{% if item.object.start_date %}{{ item.object.start_date|date:"M d, Y" }}{% else %}No start{% endif %}</span>
+                                        <span>{% if item.object.end_date %}{{ item.object.end_date|date:"M d, Y" }}{% else %}No deadline{% endif %}</span>
+                                    </div>
+                                </td>
+                                <td><div class="workspace-budget-value">{% if item.can_view_budget %}${{ item.object.budget }}{% else %}<span class="workspace-project-sub">Private</span>{% endif %}</div></td>
+                                <td class="workspace-row-actions-cell">
+                                    {% if item.can_manage %}
+                                    <div class="project-row-action-group">
+                                        <button type="button" class="project-row-action project-edit-trigger"
+                                                title="Edit Project"
+                                                aria-label="Edit Project"
+                                                data-project-id="{{ item.object.id }}"
+                                                data-project-name="{{ item.object.name }}"
+                                                data-project-description="{{ item.object.description|default:'' }}"
+                                                data-project-status="{{ item.object.status }}"
+                                                data-project-budget="{{ item.object.budget }}"
+                                                data-project-start="{{ item.object.start_date|date:'Y-m-d' }}"
+                                                data-project-end="{% if item.object.end_date %}{{ item.object.end_date|date:'Y-m-d' }}{% endif %}"
+                                                data-project-color="{{ item.object.color }}"
+                                                data-project-icon="{{ item.object.icon }}">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button type="button" class="project-row-action project-team-trigger"
+                                                title="Manage Team"
+                                                aria-label="Manage Team"
+                                                data-project-id="{{ item.object.id }}"
+                                                data-project-name="{{ item.object.name }}"
+                                                data-project-members="{% for member in item.object.project_members.all %}{{ member.user.id }}{% if not forloop.last %},{% endif %}{% endfor %}"
+                                                data-project-roles="{% for member in item.object.project_members.all %}{{ member.user.id }}:{{ member.display_role }}{% if not forloop.last %}|{% endif %}{% endfor %}">
+                                            <i class="bi bi-people"></i>
+                                        </button>
+                                        <a href="{% url 'project_board' item.object.id %}" class="project-row-action project-row-action-link" title="Open Board" aria-label="Open Board">
+                                            <i class="bi bi-kanban"></i>
+                                        </a>
+                                        <button type="button" class="project-row-action project-row-action-danger project-delete-trigger"
+                                                title="Delete Project"
+                                                aria-label="Delete Project"
+                                                data-project-id="{{ item.object.id }}"
+                                                data-project-name="{{ item.object.name }}">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                    {% else %}
+                                    <a href="{% url 'project_board' item.object.id %}" class="workspace-row-open"><i class="bi bi-arrow-up-right"></i></a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="8"><p class="workspace-empty-inline">No projects available yet.</p></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="empty-state" id="emptyState" style="display:none;">
+                    <div class="empty-icon"><i class="bi bi-folder2-open"></i></div>
+                    <div class="empty-title">No projects found</div>
+                    <p class="empty-sub">Try a different filter or search query, or create a new project.</p>
+                </div>
+            </div>
+        </section>
+    </section>
 </div>
 
 <div class="modal fade" id="newProjectModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content workspace-modal-card">
             <form method="post" action="{% url 'create_project' %}">
                 {% csrf_token %}
                 <input type="hidden" name="next" value="{{ request.path }}">
                 <input type="hidden" name="color" id="selectedProjectColor" value="#4f7cff">
                 <input type="hidden" name="icon" id="selectedProjectIcon" value="globe">
-
-                <div class="modal-header">
-                    <h5 class="modal-title">Create New Project</h5>
+                <div class="modal-header workspace-modal-header">
+                    <div>
+                        <h5 class="modal-title">Add Project</h5>
+                        <p class="workspace-modal-copy">Enter and manage project details efficiently for a cleaner delivery setup.</p>
+                    </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                    <div class="row g-4">
-                        <div class="col-md-7">
-                            <div class="mb-3">
-                                <label class="form-label">Project Name</label>
-                                <input type="text" class="form-control" name="name" placeholder="e.g. Website Revamp"
-                                    required />
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Description</label>
-                                <textarea class="form-control" name="description" rows="3"
-                                    placeholder="Briefly describe the project goals" style="resize:none;"></textarea>
-                            </div>
-                            <div class="row g-3">
-                                <div class="col-6">
-                                    <label class="form-label">Status</label>
-                                    <select class="form-select" name="status">
-                                        <option value="planned" selected>Planned</option>
-                                        <option value="in_progress">In Progress</option>
-                                        <option value="on_hold">On Hold</option>
-                                        <option value="completed">Completed</option>
-                                    </select>
-                                </div>
-                                <div class="col-6">
-                                    <label class="form-label">Budget ($)</label>
-                                    <input type="number" class="form-control" name="budget" min="0" step="0.01"
-                                        placeholder="0.00" />
-                                </div>
-                            </div>
-                            <div class="row g-3 mt-0">
-                                <div class="col-6">
-                                    <label class="form-label">Start Date</label>
-                                    <input type="date" class="form-control" name="start_date" required />
-                                </div>
-                                <div class="col-6">
-                                    <label class="form-label">Deadline</label>
-                                    <input type="date" class="form-control" name="end_date" />
+                <div class="modal-body workspace-modal-body">
+                    <div class="workspace-form-grid">
+                        <div class="workspace-form-main">
+                            <div class="workspace-form-section">
+                                <div class="workspace-form-title">Project Details</div>
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <label class="form-label">Name of Project</label>
+                                        <input type="text" class="form-control" name="name" placeholder="e.g. Website Revamp" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Project Status</label>
+                                        <select class="form-select" name="status">
+                                            <option value="planned" selected>Planned</option>
+                                            <option value="in_progress">In Progress</option>
+                                            <option value="on_hold">On Hold</option>
+                                            <option value="completed">Completed</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Budget ($)</label>
+                                        <input type="number" class="form-control" name="budget" min="0" step="0.01" placeholder="0.00">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Start Date</label>
+                                        <input type="date" class="form-control" name="start_date" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">End Date</label>
+                                        <input type="date" class="form-control" name="end_date">
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">Description</label>
+                                        <textarea class="form-control" name="description" rows="4" placeholder="Describe the objective, timeline, and important delivery notes." style="resize:none;"></textarea>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="col-md-5">
-                            <div class="mb-3">
-                                <label class="form-label">Project Colour</label>
-                                <div class="color-picker" id="colorPicker">
-                                    {% for color in project_color_options %}
-                                    <button type="button" class="color-swatch {% if forloop.first %}selected{% endif %}"
-                                        data-inline-bg="{{ color }}" data-color="{{ color }}"
-                                        aria-label="Choose color {{ color }}"></button>
-                                    {% endfor %}
+                        <aside class="workspace-form-side">
+                            <div class="workspace-form-section">
+                                <div class="workspace-form-title">Project Identity</div>
+                                <div class="mb-3">
+                                    <label class="form-label">Project Colour</label>
+                                    <div class="color-picker" id="colorPicker">
+                                        {% for color in project_color_options %}
+                                        <button type="button" class="color-swatch {% if forloop.first %}selected{% endif %}"
+                                            data-inline-bg="{{ color }}" data-color="{{ color }}"
+                                            aria-label="Choose color {{ color }}"></button>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="form-label">Project Icon</label>
+                                    <div class="icon-picker" id="iconPicker">
+                                        {% for icon in project_icon_options %}
+                                        <button type="button" class="icon-opt {% if forloop.first %}selected{% endif %}"
+                                            data-icon="{{ icon }}" aria-label="Choose icon {{ icon }}">
+                                            <i class="bi bi-{{ icon }}"></i>
+                                        </button>
+                                        {% endfor %}
+                                    </div>
                                 </div>
                             </div>
-                            <div class="mb-3">
-                                <label class="form-label">Project Icon</label>
-                                <div class="icon-picker" id="iconPicker">
-                                    {% for icon in project_icon_options %}
-                                    <button type="button" class="icon-opt {% if forloop.first %}selected{% endif %}"
-                                        data-icon="{{ icon }}" aria-label="Choose icon {{ icon }}">
-                                        <i class="bi bi-{{ icon }}"></i>
-                                    </button>
-                                    {% endfor %}
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Assign Members</label>
+
+                            <div class="workspace-form-section">
+                                <div class="workspace-form-title">Assign Team</div>
+                                <label class="form-label">Search members</label>
                                 <input type="text" id="createTeamSearch" class="form-control create-team-search"
-                                    placeholder="Search members" autocomplete="off" />
+                                    placeholder="Search by name or username" autocomplete="off">
                                 <div class="manage-team-list create-team-list">
                                     {% for member in team_options %}
                                     <label class="manage-team-option" for="create-member-{{ member.id }}"
@@ -262,24 +344,26 @@
                                             </span>
                                         </span>
                                         <span class="d-flex align-items-center gap-2">
-                                            <input type="text" class="form-control form-control-sm manage-role-input"
-                                                name="role_{{ member.id }}" placeholder="Role">
+                                            <select class="form-select form-select-sm manage-role-input" name="role_{{ member.id }}">
+                                                {% for role in project_role_options %}
+                                                <option value="{{ role.value }}" {% if role.value == 'developer' %}selected{% endif %}>{{ role.label }}</option>
+                                                {% endfor %}
+                                            </select>
                                             <input type="checkbox" name="members" value="{{ member.id }}"
-                                                id="create-member-{{ member.id }}" class="manage-team-check" />
+                                                id="create-member-{{ member.id }}" class="manage-team-check">
                                         </span>
                                     </label>
                                     {% endfor %}
                                 </div>
-                                <div class="manage-team-note">Choose the teammates who should be added to this project and assign a role like Developer, Designer, or QA Tester.
-                                </div>
+                                <div class="manage-team-note">Choose the teammates who should be added to this project and set their delivery role.</div>
                             </div>
-                        </div>
+                        </aside>
                     </div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer workspace-modal-footer">
                     <button type="button" class="btn-ghost" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn-primary-custom d-flex align-items-center gap-2">
-                        <i class="bi bi-plus-lg"></i> Create Project
+                        <i class="bi bi-plus-lg"></i> Save Changes
                     </button>
                 </div>
             </form>
@@ -288,81 +372,85 @@
 </div>
 
 <div class="modal fade" id="editProjectModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content workspace-modal-card">
             <form method="post" id="editProjectForm">
                 {% csrf_token %}
                 <input type="hidden" name="color" id="editProjectColor" value="#4f7cff">
                 <input type="hidden" name="icon" id="editProjectIcon" value="globe">
-                <div class="modal-header">
-                    <h5 class="modal-title">Edit Project</h5>
+                <div class="modal-header workspace-modal-header">
+                    <div>
+                        <h5 class="modal-title">Edit Project</h5>
+                        <p class="workspace-modal-copy">Update core project information without changing the underlying workflow or members.</p>
+                    </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                    <div class="row g-4">
-                        <div class="col-md-7">
-                            <div class="mb-3">
-                                <label class="form-label">Project Name</label>
-                                <input type="text" class="form-control" name="name" id="editProjectName" required />
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Description</label>
-                                <textarea class="form-control" name="description" id="editProjectDescription" rows="3"
-                                    style="resize:none;"></textarea>
-                            </div>
-                            <div class="row g-3">
-                                <div class="col-6">
-                                    <label class="form-label">Status</label>
-                                    <select class="form-select" name="status" id="editProjectStatus">
-                                        <option value="planned">Planned</option>
-                                        <option value="in_progress">In Progress</option>
-                                        <option value="on_hold">On Hold</option>
-                                        <option value="completed">Completed</option>
-                                    </select>
-                                </div>
-                                <div class="col-6">
-                                    <label class="form-label">Budget ($)</label>
-                                    <input type="number" class="form-control" name="budget" id="editProjectBudget"
-                                        min="0" step="0.01" />
-                                </div>
-                            </div>
-                            <div class="row g-3 mt-0">
-                                <div class="col-6">
-                                    <label class="form-label">Start Date</label>
-                                    <input type="date" class="form-control" name="start_date" id="editProjectStart"
-                                        required />
-                                </div>
-                                <div class="col-6">
-                                    <label class="form-label">Deadline</label>
-                                    <input type="date" class="form-control" name="end_date" id="editProjectEnd" />
+                <div class="modal-body workspace-modal-body">
+                    <div class="workspace-form-grid">
+                        <div class="workspace-form-main">
+                            <div class="workspace-form-section">
+                                <div class="workspace-form-title">Project Details</div>
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <label class="form-label">Name of Project</label>
+                                        <input type="text" class="form-control" name="name" id="editProjectName" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Project Status</label>
+                                        <select class="form-select" name="status" id="editProjectStatus">
+                                            <option value="planned">Planned</option>
+                                            <option value="in_progress">In Progress</option>
+                                            <option value="on_hold">On Hold</option>
+                                            <option value="completed">Completed</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Budget ($)</label>
+                                        <input type="number" class="form-control" name="budget" id="editProjectBudget" min="0" step="0.01">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Start Date</label>
+                                        <input type="date" class="form-control" name="start_date" id="editProjectStart" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">End Date</label>
+                                        <input type="date" class="form-control" name="end_date" id="editProjectEnd">
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">Description</label>
+                                        <textarea class="form-control" name="description" id="editProjectDescription" rows="4" style="resize:none;"></textarea>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-5">
-                            <div class="mb-3">
-                                <label class="form-label">Project Colour</label>
-                                <div class="color-picker" id="editColorPicker">
-                                    {% for color in project_color_options %}
-                                    <button type="button" class="color-swatch" data-inline-bg="{{ color }}"
-                                        data-color="{{ color }}" aria-label="Choose color {{ color }}"></button>
-                                    {% endfor %}
+                        <aside class="workspace-form-side">
+                            <div class="workspace-form-section">
+                                <div class="workspace-form-title">Project Identity</div>
+                                <div class="mb-3">
+                                    <label class="form-label">Project Colour</label>
+                                    <div class="color-picker" id="editColorPicker">
+                                        {% for color in project_color_options %}
+                                        <button type="button" class="color-swatch" data-inline-bg="{{ color }}"
+                                            data-color="{{ color }}" aria-label="Choose color {{ color }}"></button>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="form-label">Project Icon</label>
+                                    <div class="icon-picker" id="editIconPicker">
+                                        {% for icon in project_icon_options %}
+                                        <button type="button" class="icon-opt" data-icon="{{ icon }}"
+                                            aria-label="Choose icon {{ icon }}">
+                                            <i class="bi bi-{{ icon }}"></i>
+                                        </button>
+                                        {% endfor %}
+                                    </div>
                                 </div>
                             </div>
-                            <div class="mb-3">
-                                <label class="form-label">Project Icon</label>
-                                <div class="icon-picker" id="editIconPicker">
-                                    {% for icon in project_icon_options %}
-                                    <button type="button" class="icon-opt" data-icon="{{ icon }}"
-                                        aria-label="Choose icon {{ icon }}">
-                                        <i class="bi bi-{{ icon }}"></i>
-                                    </button>
-                                    {% endfor %}
-                                </div>
-                            </div>
-                        </div>
+                        </aside>
                     </div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer workspace-modal-footer">
                     <button type="button" class="btn-ghost" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn-primary-custom">Save Changes</button>
                 </div>
@@ -372,20 +460,24 @@
 </div>
 
 <div class="modal fade" id="manageTeamModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content workspace-modal-card">
             <form method="post" id="manageTeamForm">
                 {% csrf_token %}
-                <div class="modal-header">
-                    <h5 class="modal-title">Manage Team</h5>
+                <div class="modal-header workspace-modal-header">
+                    <div>
+                        <h5 class="modal-title">Manage Team</h5>
+                        <p class="workspace-modal-copy" id="manageTeamProjectName">Update project access and team responsibilities.</p>
+                    </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                    <p style="color:var(--muted);font-size:13px;margin-bottom:14px;" id="manageTeamProjectName"></p>
+                <div class="modal-body workspace-modal-body">
                     <label class="form-label">Team Members</label>
+                    <input type="text" id="manageTeamSearch" class="form-control create-team-search mb-3"
+                        placeholder="Search by name or username" autocomplete="off">
                     <div class="manage-team-list" id="manageTeamMembers">
                         {% for member in team_options %}
-                        <label class="manage-team-option" for="manage-member-{{ member.id }}">
+                        <label class="manage-team-option" for="manage-member-{{ member.id }}" data-member-search="{{ member.display_name|lower }} {% if member.username %}@{{ member.username|lower }}{% endif %}">
                             <span class="manage-team-user">
                                 <span class="proj-ava manage-team-avatar" data-avatar-user-id="{{ member.id }}" data-avatar-initials="{{ member.initials }}">{% if member.avatar_url %}<img src="{{ member.avatar_url }}" alt="{{ member.display_name }}" class="avatar-media avatar-media-cover">{% else %}{{ member.initials }}{% endif %}</span>
                                 <span class="manage-team-meta">
@@ -396,17 +488,21 @@
                                 </span>
                             </span>
                             <span class="d-flex align-items-center gap-2">
-                                <input type="text" class="form-control form-control-sm manage-role-input"
-                                    name="role_{{ member.id }}" id="manage-role-{{ member.id }}" placeholder="Role">
+                                <select class="form-select form-select-sm manage-role-input"
+                                    name="role_{{ member.id }}" id="manage-role-{{ member.id }}">
+                                    {% for role in project_role_options %}
+                                    <option value="{{ role.value }}" {% if role.value == 'developer' %}selected{% endif %}>{{ role.label }}</option>
+                                    {% endfor %}
+                                </select>
                                 <input type="checkbox" name="members" value="{{ member.id }}"
-                                    id="manage-member-{{ member.id }}" class="manage-team-check" />
+                                    id="manage-member-{{ member.id }}" class="manage-team-check">
                             </span>
                         </label>
                         {% endfor %}
                     </div>
                     <div class="manage-team-note">Select the teammates who should have access to this project and set their project-specific role.</div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer workspace-modal-footer">
                     <button type="button" class="btn-ghost" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn-primary-custom">Update Team</button>
                 </div>
@@ -417,18 +513,20 @@
 
 <div class="modal fade" id="deleteProjectModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
+        <div class="modal-content workspace-modal-card">
             <form method="post" id="deleteProjectForm">
                 {% csrf_token %}
-                <div class="modal-header">
-                    <h5 class="modal-title">Delete Project</h5>
+                <div class="modal-header workspace-modal-header">
+                    <div>
+                        <h5 class="modal-title">Delete Project</h5>
+                        <p class="workspace-modal-copy">This action removes the project and its related activity history.</p>
+                    </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                    <p style="margin:0;color:var(--muted);font-size:14px;">Delete <strong
-                            id="deleteProjectName"></strong>? This will also remove its related tasks and activity.</p>
+                <div class="modal-body workspace-modal-body">
+                    <p style="margin:0;color:var(--muted);font-size:14px;">Delete <strong id="deleteProjectName"></strong>? This will also remove related tasks and activity.</p>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer workspace-modal-footer">
                     <button type="button" class="btn-ghost" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn-primary-custom" style="background:var(--high);">Delete</button>
                 </div>

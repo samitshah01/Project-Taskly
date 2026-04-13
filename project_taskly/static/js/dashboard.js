@@ -130,7 +130,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const chart = document.getElementById("commitChart");
     if (chart) {
-        const safeData = (data && Array.isArray(data) && data.length > 0) ? data : [0, 0, 0, 0, 0, 0, 0];
+        const chartLabels = ["Completed", "In Progress", "Pending", "Overdue"];
+        const chartColors = ["var(--low)", "var(--accent)", "var(--med)", "var(--high)"];
+        const rawData = (chart.dataset.chartValues || "")
+            .split(",")
+            .map(value => Number(value || 0))
+            .filter(value => !Number.isNaN(value));
+        const safeData = rawData.length ? rawData : [0, 0, 0, 0];
         const validData = safeData.filter(v => typeof v === "number" && !isNaN(v));
         const renderEmptyChart = () => {
             const emptyMessage = document.createElement("div");
@@ -142,13 +148,38 @@ document.addEventListener("DOMContentLoaded", function () {
         if (validData.length > 0) {
             const max = Math.max(...validData);
             if (isFinite(max) && max > 0) {
-                validData.forEach(v => {
+                validData.forEach((value, index) => {
+                    const item = document.createElement("div");
+                    item.className = "dashboard-bar-chart-item";
+
+                    const rail = document.createElement("div");
+                    rail.className = "dashboard-bar-chart-rail";
+
                     const bar = document.createElement("div");
-                    bar.style.cssText = `flex:1;border-radius:3px 3px 0 0;height:${Math.max(4, (v / max) * 100)}%;background:${v > 6 ? "var(--accent)" : v > 3 ? "rgba(79,124,255,.5)" : "rgba(79,124,255,.25)"};transition:opacity .15s;cursor:default;`;
-                    bar.title = `${v} tasks`;
-                    bar.addEventListener("mouseenter", () => bar.style.opacity = ".7");
-                    bar.addEventListener("mouseleave", () => bar.style.opacity = "1");
-                    chart.appendChild(bar);
+                    bar.className = "dashboard-bar-chart-bar";
+                    bar.style.height = `${Math.max(8, (value / max) * 100)}%`;
+                    bar.style.background = `linear-gradient(180deg, ${chartColors[index] || "var(--accent)"}, rgba(255,255,255,0.08))`;
+                    bar.title = `${chartLabels[index] || "Value"}: ${value}`;
+                    bar.addEventListener("mouseenter", () => {
+                        bar.style.opacity = ".82";
+                        bar.style.transform = "translateY(-2px)";
+                    });
+                    bar.addEventListener("mouseleave", () => {
+                        bar.style.opacity = "1";
+                        bar.style.transform = "translateY(0)";
+                    });
+
+                    const meta = document.createElement("div");
+                    meta.className = "dashboard-bar-chart-meta";
+                    meta.innerHTML = `
+                        <span class="dashboard-bar-chart-label">${chartLabels[index] || "Metric"}</span>
+                        <span class="dashboard-bar-chart-value">${value}</span>
+                    `;
+
+                    rail.appendChild(bar);
+                    item.appendChild(rail);
+                    item.appendChild(meta);
+                    chart.appendChild(item);
                 });
             } else {
                 renderEmptyChart();
@@ -160,14 +191,20 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Projects Page
     const filterPills = document.querySelectorAll(".filter-pill");
-    const allGridCards = document.querySelectorAll("#gridView .project-card-shell");
+    const allGridCards = document.querySelectorAll("#gridView .project-card-shell, #gridView [data-project-row]");
     const emptyState = document.getElementById("emptyState");
+    const projectListSearch = document.getElementById("projectListSearch");
+    let activeProjectSearch = "";
+    let activeProjectFilter = "all";
 
-    function applyFilter(filter) {
+    function applyProjectVisibility() {
         if (!allGridCards.length || !emptyState) return;
         let visibleCount = 0;
         allGridCards.forEach(card => {
-            const match = filter === "all" || card.dataset.status === filter;
+            const filterMatch = activeProjectFilter === "all" || card.dataset.status === activeProjectFilter;
+            const searchHaystack = (card.dataset.name || "").toLowerCase();
+            const searchMatch = !activeProjectSearch || searchHaystack.includes(activeProjectSearch);
+            const match = filterMatch && searchMatch;
             card.style.display = match ? "" : "none";
             if (match) visibleCount++;
         });
@@ -204,8 +241,242 @@ document.addEventListener("DOMContentLoaded", function () {
             pill.addEventListener("click", () => {
                 filterPills.forEach(p => p.classList.remove("active"));
                 pill.classList.add("active");
-                applyFilter(pill.dataset.filter);
+                activeProjectFilter = pill.dataset.filter || "all";
+                applyProjectVisibility();
             });
+        });
+    }
+
+    if (projectListSearch) {
+        projectListSearch.addEventListener("input", () => {
+            activeProjectSearch = projectListSearch.value.trim().toLowerCase();
+            applyProjectVisibility();
+        });
+    }
+
+    if (allGridCards.length) {
+        applyProjectVisibility();
+    }
+
+    const budgetListSearch = document.getElementById("budgetListSearch");
+    const budgetRows = document.querySelectorAll("[data-budget-row]");
+    const budgetCards = document.querySelectorAll("[data-budget-card]");
+    const budgetNavLinks = document.querySelectorAll("[data-budget-nav]");
+    let activeBudgetFilter = "all";
+    let activeBudgetSearch = "";
+
+    function budgetFilterMatch(node) {
+        if (activeBudgetFilter === "all") return true;
+        const filters = (node.dataset.budgetFilter || "").split(/\s+/).filter(Boolean);
+        return filters.includes(activeBudgetFilter);
+    }
+
+    function applyBudgetVisibility() {
+        budgetRows.forEach(row => {
+            const haystack = (row.dataset.name || "").toLowerCase();
+            const searchMatch = !activeBudgetSearch || haystack.includes(activeBudgetSearch);
+            const visible = budgetFilterMatch(row) && searchMatch;
+            row.style.display = visible ? "" : "none";
+        });
+
+        budgetCards.forEach(card => {
+            const haystack = (card.dataset.name || "").toLowerCase();
+            const searchMatch = !activeBudgetSearch || haystack.includes(activeBudgetSearch);
+            const visible = budgetFilterMatch(card) && searchMatch;
+            card.style.display = visible ? "" : "none";
+        });
+    }
+
+    if (budgetListSearch && (budgetRows.length || budgetCards.length)) {
+        budgetListSearch.addEventListener("input", () => {
+            activeBudgetSearch = budgetListSearch.value.trim().toLowerCase();
+            applyBudgetVisibility();
+        });
+    }
+
+    if (budgetNavLinks.length) {
+        budgetNavLinks.forEach(link => {
+            link.addEventListener("click", () => {
+                budgetNavLinks.forEach(item => item.classList.remove("active"));
+                link.classList.add("active");
+                activeBudgetFilter = link.dataset.budgetNav || "all";
+                applyBudgetVisibility();
+            });
+        });
+    }
+
+    if (budgetRows.length || budgetCards.length) {
+        applyBudgetVisibility();
+    }
+
+    const budgetExpenseModalEl = document.getElementById("budgetExpenseModal");
+    const budgetCategoryModalEl = document.getElementById("budgetCategoryModal");
+    const budgetExpenseModal = budgetExpenseModalEl ? new bootstrap.Modal(budgetExpenseModalEl) : null;
+    const budgetCategoryModal = budgetCategoryModalEl ? new bootstrap.Modal(budgetCategoryModalEl) : null;
+    const budgetExpenseForm = document.getElementById("budgetExpenseForm");
+    const budgetCategoryForm = document.getElementById("budgetCategoryForm");
+    const budgetExpenseCategory = document.getElementById("budgetExpenseCategory");
+    const budgetExpenseNext = document.getElementById("budgetExpenseNext");
+    const budgetCategoryNext = document.getElementById("budgetCategoryNext");
+    const budgetExpenseProjectCopy = document.getElementById("budgetExpenseProjectCopy");
+    const budgetCategoryProjectCopy = document.getElementById("budgetCategoryProjectCopy");
+
+    document.querySelectorAll(".budget-expense-trigger").forEach(button => {
+        button.addEventListener("click", () => {
+            if (!budgetExpenseForm || !budgetExpenseCategory) return;
+
+            budgetExpenseForm.action = button.dataset.expenseAction || "";
+            if (budgetExpenseNext) budgetExpenseNext.value = button.dataset.nextUrl || window.location.pathname;
+            if (budgetExpenseProjectCopy) {
+                budgetExpenseProjectCopy.textContent = `Record a project expense for ${button.dataset.projectName} with the right category and amount.`;
+            }
+
+            budgetExpenseCategory.innerHTML = '<option value="">Choose category</option>';
+            const categories = (button.dataset.categoryOptions || "").split("||").filter(Boolean);
+            categories.forEach(entry => {
+                const [value, label] = entry.split("::");
+                if (!value || !label) return;
+                const option = document.createElement("option");
+                option.value = value;
+                option.textContent = label;
+                budgetExpenseCategory.appendChild(option);
+            });
+
+            if (budgetExpenseModal) budgetExpenseModal.show();
+        });
+    });
+
+    document.querySelectorAll(".budget-category-trigger").forEach(button => {
+        button.addEventListener("click", () => {
+            if (!budgetCategoryForm) return;
+
+            budgetCategoryForm.action = button.dataset.categoryAction || "";
+            if (budgetCategoryNext) budgetCategoryNext.value = button.dataset.nextUrl || window.location.pathname;
+            if (budgetCategoryProjectCopy) {
+                budgetCategoryProjectCopy.textContent = `Create a reusable expense category for ${button.dataset.projectName}.`;
+            }
+
+            if (budgetCategoryModal) budgetCategoryModal.show();
+        });
+    });
+
+    const financeTransactionModalEl = document.getElementById("financeTransactionModal");
+    const financeTransactionModal = financeTransactionModalEl ? new bootstrap.Modal(financeTransactionModalEl) : null;
+    const financeTransactionForm = document.getElementById("financeTransactionForm");
+    const financeModalTitle = document.getElementById("financeModalTitle");
+    const financeModalCopy = document.getElementById("financeModalCopy");
+    const financeProjectInput = document.getElementById("financeProjectInput");
+    const financeNextInput = financeTransactionForm ? financeTransactionForm.querySelector('input[name="next"]') : null;
+    const financeTitleInput = document.getElementById("financeTitleInput");
+    const financeEntryKindInput = document.getElementById("financeEntryKindInput");
+    const financeAmountInput = document.getElementById("financeAmountInput");
+    const financeStatusInput = document.getElementById("financeStatusInput");
+    const financeIssueDateInput = document.getElementById("financeIssueDateInput");
+    const financePaidDateInput = document.getElementById("financePaidDateInput");
+    const financeReferenceInput = document.getElementById("financeReferenceInput");
+    const financeDescriptionInput = document.getElementById("financeDescriptionInput");
+    const financeAssignedUserField = document.getElementById("financeAssignedUserField");
+    const financeAssignedUserInput = document.getElementById("financeAssignedUserInput");
+    const financeSubmitButton = document.getElementById("financeSubmitButton");
+    const financeCreateButton = document.querySelector("[data-finance-create]");
+    const projectFileInput = document.getElementById("projectFileInput");
+    const projectFileName = document.querySelector("[data-file-name]");
+    const financeProjectMemberMapNode = document.getElementById("finance-project-member-map");
+    const financeProjectMemberMap = financeProjectMemberMapNode ? JSON.parse(financeProjectMemberMapNode.textContent) : {};
+
+    function populateFinanceProjectMembers(projectId, selectedAssignedUserId = "") {
+        if (!financeAssignedUserInput) return;
+        const members = financeProjectMemberMap[String(projectId || "")] || [];
+        financeAssignedUserInput.innerHTML = '<option value="">Choose team member</option>';
+        members.forEach(member => {
+            const option = document.createElement("option");
+            option.value = member.id;
+            option.textContent = member.role ? `${member.name} (${member.role})` : member.name;
+            if (String(member.id) === String(selectedAssignedUserId || "")) option.selected = true;
+            financeAssignedUserInput.appendChild(option);
+        });
+    }
+
+    function syncFinanceNextUrl() {
+        if (!financeProjectInput || !financeNextInput) return;
+        const selectedOption = financeProjectInput.options[financeProjectInput.selectedIndex];
+        const budgetUrl = selectedOption ? selectedOption.dataset.budgetUrl : "";
+        financeNextInput.value = budgetUrl ? `${budgetUrl}?tab=all` : window.location.pathname;
+    }
+
+    function syncFinanceEntryMode(selectedAssignedUserId = "") {
+        if (!financeEntryKindInput) return;
+        const isSalary = financeEntryKindInput.value === "salary";
+        const currentProjectId = financeProjectInput ? financeProjectInput.value : "";
+
+        if (financeAssignedUserField) {
+            financeAssignedUserField.classList.toggle("d-none", !isSalary);
+        }
+        if (financeAssignedUserInput) {
+            financeAssignedUserInput.required = isSalary;
+            populateFinanceProjectMembers(currentProjectId, selectedAssignedUserId);
+        }
+    }
+
+    function resetFinanceForm() {
+        if (!financeTransactionForm) return;
+        financeTransactionForm.action = "/dashboard/finance/create/";
+        financeTransactionForm.reset();
+        if (financeModalTitle) financeModalTitle.textContent = "Add Transaction";
+        if (financeModalCopy) financeModalCopy.textContent = "Create a structured budget entry for this project.";
+        if (financeSubmitButton) financeSubmitButton.textContent = "Save Transaction";
+        if (financeEntryKindInput) financeEntryKindInput.value = "expense";
+        if (financeProjectInput && financeProjectInput.value === "") financeProjectInput.value = financeProjectInput.defaultValue || "";
+        syncFinanceNextUrl();
+        syncFinanceEntryMode();
+    }
+
+    if (financeEntryKindInput) {
+        financeEntryKindInput.addEventListener("change", () => {
+            syncFinanceEntryMode();
+        });
+    }
+
+    if (financeProjectInput) {
+        financeProjectInput.addEventListener("change", () => {
+            syncFinanceNextUrl();
+            syncFinanceEntryMode();
+        });
+    }
+
+    if (financeCreateButton) {
+        financeCreateButton.addEventListener("click", () => {
+            resetFinanceForm();
+            if (financeTransactionModal) financeTransactionModal.show();
+        });
+    }
+
+    document.querySelectorAll(".finance-edit-trigger").forEach(button => {
+        button.addEventListener("click", () => {
+            if (!financeTransactionForm) return;
+            financeTransactionForm.action = `/dashboard/finance/${button.dataset.transactionId}/update/`;
+            if (financeModalTitle) financeModalTitle.textContent = "Edit Transaction";
+            if (financeModalCopy) financeModalCopy.textContent = "Update this budget transaction without leaving the project workspace.";
+            if (financeSubmitButton) financeSubmitButton.textContent = "Update Transaction";
+            if (financeProjectInput) financeProjectInput.value = button.dataset.projectId || "";
+            if (financeTitleInput) financeTitleInput.value = button.dataset.title || "";
+            if (financeEntryKindInput) financeEntryKindInput.value = button.dataset.entryKind || "expense";
+            if (financeAmountInput) financeAmountInput.value = button.dataset.amount || "";
+            if (financeStatusInput) financeStatusInput.value = button.dataset.status || "pending";
+            if (financeIssueDateInput) financeIssueDateInput.value = button.dataset.issueDate || "";
+            if (financePaidDateInput) financePaidDateInput.value = button.dataset.paidDate || "";
+            if (financeReferenceInput) financeReferenceInput.value = button.dataset.referenceId || "";
+            if (financeDescriptionInput) financeDescriptionInput.value = button.dataset.description || "";
+            syncFinanceNextUrl();
+            syncFinanceEntryMode(button.dataset.assignedUserId || "");
+            if (financeTransactionModal) financeTransactionModal.show();
+        });
+    });
+
+    if (projectFileInput && projectFileName) {
+        projectFileInput.addEventListener("change", () => {
+            const selectedFile = projectFileInput.files && projectFileInput.files[0];
+            projectFileName.textContent = selectedFile ? selectedFile.name : "No file chosen";
         });
     }
 
@@ -230,6 +501,39 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
+    const manageTeamSearch = document.getElementById("manageTeamSearch");
+    const manageTeamOptions = document.querySelectorAll("#manageTeamMembers .manage-team-option");
+    const projectRoleValueMap = {
+        "product owner": "product_owner",
+        "project manager": "project_manager",
+        "client": "client",
+        "developer": "developer",
+        "designer": "designer",
+        "qa engineer": "qa_engineer",
+        "business analyst": "business_analyst",
+        "devops engineer": "devops_engineer"
+    };
+
+    function normalizeProjectRoleSelection(roleValue) {
+        const normalized = String(roleValue || "").trim().toLowerCase();
+        return projectRoleValueMap[normalized] || normalized || "developer";
+    }
+
+    if (manageTeamSearch && manageTeamOptions.length) {
+        const filterManageTeamOptions = () => {
+            const query = manageTeamSearch.value.trim().toLowerCase();
+            manageTeamOptions.forEach(option => {
+                const haystack = option.dataset.memberSearch || "";
+                option.style.display = !query || haystack.includes(query) ? "" : "none";
+            });
+        };
+
+        filterManageTeamOptions();
+        manageTeamSearch.addEventListener("input", () => {
+            filterManageTeamOptions();
+        });
+    }
+
     const editProjectModalEl = document.getElementById("editProjectModal");
     const manageTeamModalEl = document.getElementById("manageTeamModal");
     const deleteProjectModalEl = document.getElementById("deleteProjectModal");
@@ -237,31 +541,9 @@ document.addEventListener("DOMContentLoaded", function () {
     const manageTeamModal = manageTeamModalEl ? new bootstrap.Modal(manageTeamModalEl) : null;
     const deleteProjectModal = deleteProjectModalEl ? new bootstrap.Modal(deleteProjectModalEl) : null;
 
-    document.querySelectorAll(".project-card-menu, .project-card-menu .dropdown-menu").forEach(menu => {
-        menu.addEventListener("click", event => {
-            event.preventDefault();
-            event.stopPropagation();
-        });
-    });
-
-    document.querySelectorAll(".proj-menu-btn").forEach(button => {
-        button.addEventListener("click", event => {
-            event.preventDefault();
-            event.stopPropagation();
-        });
-    });
-
-    function closeProjectDropdown(button) {
-        const dropdownToggle = button.closest(".dropdown")?.querySelector('[data-bs-toggle="dropdown"]');
-        if (!dropdownToggle) return;
-        bootstrap.Dropdown.getOrCreateInstance(dropdownToggle).hide();
-    }
-
     document.querySelectorAll(".project-edit-trigger").forEach(button => {
         button.addEventListener("click", event => {
             event.preventDefault();
-            event.stopPropagation();
-            closeProjectDropdown(button);
             const editProjectForm = document.getElementById("editProjectForm");
             if (!editProjectForm) return;
             editProjectForm.action = `/dashboard/projects/${button.dataset.projectId}/update/`;
@@ -281,8 +563,6 @@ document.addEventListener("DOMContentLoaded", function () {
     document.querySelectorAll(".project-team-trigger").forEach(button => {
         button.addEventListener("click", event => {
             event.preventDefault();
-            event.stopPropagation();
-            closeProjectDropdown(button);
             const manageTeamForm = document.getElementById("manageTeamForm");
             const manageTeamProjectName = document.getElementById("manageTeamProjectName");
             if (!manageTeamForm || !manageTeamProjectName) return;
@@ -302,8 +582,14 @@ document.addEventListener("DOMContentLoaded", function () {
             });
             document.querySelectorAll("#manageTeamMembers .manage-role-input").forEach(input => {
                 const userId = input.name.replace("role_", "");
-                input.value = selectedRoles[userId] || "";
+                input.value = normalizeProjectRoleSelection(selectedRoles[userId]);
             });
+            if (manageTeamSearch) {
+                manageTeamSearch.value = "";
+                manageTeamOptions.forEach(option => {
+                    option.style.display = "";
+                });
+            }
             if (manageTeamModal) manageTeamModal.show();
         });
     });
@@ -311,8 +597,6 @@ document.addEventListener("DOMContentLoaded", function () {
     document.querySelectorAll(".project-delete-trigger").forEach(button => {
         button.addEventListener("click", event => {
             event.preventDefault();
-            event.stopPropagation();
-            closeProjectDropdown(button);
             const deleteProjectForm = document.getElementById("deleteProjectForm");
             const deleteProjectName = document.getElementById("deleteProjectName");
             if (!deleteProjectForm || !deleteProjectName) return;

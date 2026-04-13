@@ -1,0 +1,306 @@
+{% extends 'components/dashboard_base.html' %}
+
+{% block title %}{{ project.name }} Budget - Taskly{% endblock %}
+
+{% block dashboard_content %}
+<div class="main-area workspace-page">
+    <section class="workspace-shell budget-theme-two">
+        <div class="workspace-shell-header">
+            <div>
+                <div class="board-breadcrumb">
+                    <a href="{% url 'projects' %}">Projects</a>
+                    <span>/</span>
+                    <a href="{% url 'project_board' project.id %}">{{ project.name }}</a>
+                    <span>/</span>
+                    <span>Budget</span>
+                </div>
+                <div class="workspace-heading-row">
+                    <div class="workspace-heading-copy">
+                        <span class="workspace-kicker">{% if is_owner_finance %}Budget Management{% else %}Payment History{% endif %}</span>
+                        <h1 class="workspace-title">{{ project.name }}</h1>
+                        <p class="workspace-copy">
+                            {% if is_owner_finance %}
+                            Manage project budget, income, expenses, and salary payouts in one structured workspace.
+                            {% else %}
+                            Review only the salary and payment transactions assigned to you for this project.
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="workspace-heading-actions">
+                        {% if is_owner_finance %}
+                        <button type="button" class="btn-primary-custom workspace-action-btn d-flex align-items-center gap-2" data-finance-create>
+                            <i class="bi bi-plus-lg"></i> Add Transaction
+                        </button>
+                        {% endif %}
+                        <a href="{% url 'project_board' project.id %}" class="btn-ghost workspace-view-chip">
+                            <i class="bi bi-kanban"></i> Open Board
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if is_owner_finance %}
+        <div class="workspace-stat-grid budget-theme-two-stats">
+            <article class="workspace-stat-card">
+                <span class="workspace-stat-label">Total Budget</span>
+                <strong class="workspace-stat-value">${{ budget_total }}</strong>
+                <span class="workspace-stat-foot">Defined by the project owner</span>
+            </article>
+            <article class="workspace-stat-card">
+                <span class="workspace-stat-label">Total Income</span>
+                <strong class="workspace-stat-value">${{ project_budget_income_total }}</strong>
+                <span class="workspace-stat-foot">{{ finance_paid_count }} paid transactions logged</span>
+            </article>
+            <article class="workspace-stat-card">
+                <span class="workspace-stat-label">Total Expenses</span>
+                <strong class="workspace-stat-value">${{ project_budget_expense_total }}</strong>
+                <span class="workspace-stat-foot">${{ finance_salary_total }} in salary payments</span>
+            </article>
+            <article class="workspace-stat-card budget-remaining-card">
+                <span class="workspace-stat-label">Remaining Balance</span>
+                <strong class="workspace-stat-value">${{ budget_remaining_total }}</strong>
+                <span class="workspace-stat-foot">{{ budget_usage_percent }}% of budget used</span>
+            </article>
+        </div>
+        {% else %}
+        <div class="workspace-stat-grid budget-theme-two-stats budget-theme-two-stats-member">
+            <article class="workspace-stat-card">
+                <span class="workspace-stat-label">Total Received</span>
+                <strong class="workspace-stat-value">${{ finance_salary_total }}</strong>
+                <span class="workspace-stat-foot">Your salary and payment history for this project</span>
+            </article>
+            <article class="workspace-stat-card">
+                <span class="workspace-stat-label">Paid Entries</span>
+                <strong class="workspace-stat-value">{{ finance_paid_count }}</strong>
+                <span class="workspace-stat-foot">{{ finance_pending_count }} pending or processing</span>
+            </article>
+            <article class="workspace-stat-card">
+                <span class="workspace-stat-label">Latest Payment</span>
+                <strong class="workspace-stat-value">{% if project_salary_latest_date %}{{ project_salary_latest_date|date:"M d, Y" }}{% else %}No payment yet{% endif %}</strong>
+                <span class="workspace-stat-foot">Only your assigned transactions are shown</span>
+            </article>
+        </div>
+        {% endif %}
+
+        <section class="workspace-panel workspace-panel-tall budget-theme-two-panel">
+            <div class="workspace-panel-head">
+                <div>
+                    <div class="workspace-panel-title-row">
+                        <h2 class="workspace-panel-title">{% if is_owner_finance %}Transactions{% else %}My Salary Payments{% endif %}</h2>
+                        <span class="workspace-panel-count">{{ finance_transaction_count }}</span>
+                    </div>
+                    <p class="workspace-panel-copy">
+                        {% if is_owner_finance %}
+                        Income, expenses, and salary payouts for this project.
+                        {% else %}
+                        Transactions assigned to you only. Budget totals and other team payments are hidden.
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="workspace-view-actions">
+                    <button type="button" class="workspace-view-chip active">
+                        <i class="bi bi-table"></i> List View
+                    </button>
+                </div>
+            </div>
+
+            <div class="workspace-toolbar">
+                <div class="filter-bar workspace-tabs">
+                    {% if is_owner_finance %}
+                    <a href="{{ finance_transactions_url }}?tab=all" class="filter-pill {% if finance_active_tab == 'all' %}active{% endif %}">All</a>
+                    <a href="{{ finance_transactions_url }}?tab=income" class="filter-pill {% if finance_active_tab == 'income' %}active{% endif %}">Income</a>
+                    <a href="{{ finance_transactions_url }}?tab=expense" class="filter-pill {% if finance_active_tab == 'expense' %}active{% endif %}">Expenses</a>
+                    <a href="{{ finance_transactions_url }}?tab=salary" class="filter-pill {% if finance_active_tab == 'salary' %}active{% endif %}">Salary Payments</a>
+                    {% else %}
+                    <a href="{{ finance_transactions_url }}?tab=all" class="filter-pill {% if finance_active_tab == 'all' %}active{% endif %}">All Payments</a>
+                    <a href="{{ finance_transactions_url }}?tab=paid" class="filter-pill {% if finance_active_tab == 'paid' %}active{% endif %}">Paid</a>
+                    <a href="{{ finance_transactions_url }}?tab=pending" class="filter-pill {% if finance_active_tab == 'pending' %}active{% endif %}">Pending</a>
+                    {% endif %}
+                </div>
+
+                <form method="get" class="workspace-toolbar-actions projects-filter-form workspace-filter-form budget-theme-two-filters">
+                    <input type="hidden" name="tab" value="{{ finance_active_tab|default:'all' }}">
+                    <div class="workspace-search">
+                        <i class="bi bi-search"></i>
+                        <input type="search" name="search" class="form-control" placeholder="Search transactions" value="{{ finance_filters.search }}">
+                    </div>
+                    <input type="date" name="date_from" class="form-control" value="{{ finance_filters.date_from }}">
+                    <input type="date" name="date_to" class="form-control" value="{{ finance_filters.date_to }}">
+                    <select name="status" class="form-select">
+                        <option value="">All statuses</option>
+                        {% for value, label in finance_status_choices %}
+                        <option value="{{ value }}" {% if finance_filters.status == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn-ghost">Filter</button>
+                    {% if is_owner_finance %}
+                    <a href="{{ finance_transactions_url }}?tab={{ finance_active_tab|default:'all' }}&search={{ finance_filters.search|urlencode }}&date_from={{ finance_filters.date_from|urlencode }}&date_to={{ finance_filters.date_to|urlencode }}&status={{ finance_filters.status|urlencode }}&export=csv" class="btn-ghost">
+                        <i class="bi bi-download"></i> Export
+                    </a>
+                    {% endif %}
+                </form>
+            </div>
+
+            <div class="workspace-table-shell finance-ledger-shell">
+                <div class="workspace-table-scroll">
+                    <table class="workspace-table finance-table">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                {% if is_owner_finance %}<th>Project</th>{% endif %}
+                                <th>Type</th>
+                                {% if is_owner_finance %}<th>Paid To</th>{% endif %}
+                                <th>Date</th>
+                                <th>Status</th>
+                                <th>Amount</th>
+                                {% if is_owner_finance %}<th>Actions</th>{% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in finance_rows %}
+                            <tr>
+                                <td>
+                                    <div class="finance-title-cell">
+                                        <div>
+                                            <div class="workspace-cell-strong">{{ item.title }}</div>
+                                            <div class="workspace-project-sub">{{ item.object.note|default:item.object.description|default:"No details added." }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                {% if is_owner_finance %}<td>{{ item.project_name }}</td>{% endif %}
+                                <td>
+                                    <span class="finance-amount-pill {% if item.is_income %}income{% else %}expense{% endif %}">
+                                        {{ item.entry_kind_label }}
+                                    </span>
+                                </td>
+                                {% if is_owner_finance %}<td>{{ item.assigned_user_name|default:"-" }}</td>{% endif %}
+                                <td>{% if item.paid_date %}{{ item.paid_date|date:"M d, Y" }}{% elif item.issue_date %}{{ item.issue_date|date:"M d, Y" }}{% else %}-{% endif %}</td>
+                                <td><span class="badge {{ item.status_badge_class }}">{{ item.status_label }}</span></td>
+                                <td>
+                                    <span class="finance-table-amount {% if item.is_income %}income{% else %}expense{% endif %}">
+                                        {% if item.is_income %}+{% else %}-{% endif %}${{ item.amount }}
+                                    </span>
+                                </td>
+                                {% if is_owner_finance %}
+                                <td class="workspace-row-actions-cell">
+                                    <button type="button"
+                                        class="workspace-row-open finance-edit-trigger"
+                                        data-transaction-id="{{ item.object.id }}"
+                                        data-project-id="{{ item.object.project_id }}"
+                                        data-title="{{ item.title }}"
+                                        data-reference-id="{{ item.object.reference_id|default:'' }}"
+                                        data-entry-kind="{% if item.is_salary_payment %}salary{% elif item.is_income %}income{% else %}expense{% endif %}"
+                                        data-amount="{{ item.object.amount }}"
+                                        data-status="{{ item.object.status }}"
+                                        data-issue-date="{{ item.object.issue_date|date:'Y-m-d' }}"
+                                        data-paid-date="{{ item.object.paid_date|date:'Y-m-d' }}"
+                                        data-description="{{ item.object.note|default:item.object.description|default:'' }}"
+                                        data-assigned-user-id="{{ item.object.assigned_user_id|default:'' }}">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </button>
+                                </td>
+                                {% endif %}
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="{% if is_owner_finance %}8{% else %}5{% endif %}">
+                                    <p class="workspace-empty-inline">No transactions matched your current filters.</p>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </section>
+</div>
+{% endblock %}
+
+{% block modals %}
+{% if is_owner_finance %}
+<div class="modal fade" id="financeTransactionModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content workspace-modal-card">
+            <form method="post" id="financeTransactionForm" action="{% url 'create_finance_transaction' %}">
+                {% csrf_token %}
+                <div class="modal-header workspace-modal-header">
+                    <div>
+                        <h5 class="modal-title" id="financeModalTitle">Add Transaction</h5>
+                        <p class="workspace-modal-copy" id="financeModalCopy">Create a structured budget entry for this project.</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body workspace-modal-body">
+                    <input type="hidden" name="next" value="{{ finance_transactions_url }}?tab={{ finance_active_tab|default:'all' }}">
+                    <div class="workspace-form-section">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Title</label>
+                                <input type="text" class="form-control" name="title" id="financeTitleInput" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Project</label>
+                                <select class="form-select" name="project" id="financeProjectInput" required>
+                                    {% for finance_project in finance_project_options %}
+                                    <option value="{{ finance_project.id }}" data-budget-url="{% url 'project_budget' finance_project.id %}" {% if finance_project.id == project.id %}selected{% endif %}>{{ finance_project.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Transaction Type</label>
+                                <select class="form-select" name="entry_kind" id="financeEntryKindInput" required>
+                                    {% for value, label in finance_entry_kind_choices %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6 d-none" id="financeAssignedUserField">
+                                <label class="form-label">Team Member</label>
+                                <select class="form-select" name="assigned_user" id="financeAssignedUserInput">
+                                    <option value="">Choose team member</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Amount</label>
+                                <input type="number" class="form-control" name="amount" id="financeAmountInput" min="0.01" step="0.01" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Status</label>
+                                <select class="form-select" name="status" id="financeStatusInput" required>
+                                    {% for value, label in finance_status_choices %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Date</label>
+                                <input type="date" class="form-control" name="issue_date" id="financeIssueDateInput">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Paid Date</label>
+                                <input type="date" class="form-control" name="paid_date" id="financePaidDateInput">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Reference ID</label>
+                                <input type="text" class="form-control" name="reference_id" id="financeReferenceInput" placeholder="TXN-1001">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Description</label>
+                                <textarea class="form-control" rows="4" name="description" id="financeDescriptionInput" placeholder="Add context for this transaction."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer workspace-modal-footer">
+                    <button type="button" class="btn-ghost" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn-primary-custom" id="financeSubmitButton">Save Transaction</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{{ finance_project_member_map|json_script:"finance-project-member-map" }}
+{% endif %}
+{% endblock %}

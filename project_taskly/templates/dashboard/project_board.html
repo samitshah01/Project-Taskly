@@ -33,106 +33,162 @@
     <div class="board-top-meta">
         <div class="board-top-chip"><i class="bi bi-graph-up-arrow"></i> <span id="boardProgressValue">{{ project_summary.progress }}</span>% complete</div>
         <div class="board-top-chip"><i class="bi bi-calendar3"></i> {% if project.end_date %}Due {{ project.end_date|date:"M d, Y" }}{% else %}No deadline{% endif %}</div>
+        {% if can_view_project_budget %}
         <div class="board-top-chip"><i class="bi bi-cash-stack"></i> ${{ project.budget }}</div>
+        {% endif %}
         <div class="board-top-chip"><i class="bi bi-people"></i> <span id="boardTaskTotal">{{ project_summary.total_tasks }}</span> tasks</div>
     </div>
 
-    <div class="panel-card fade-in" style="margin-bottom:16px;">
-        <div class="section-hdr">
-            <div class="panel-card-title" style="margin-bottom:0;"><i class="bi bi-people" style="color:var(--accent2);"></i> Team Members</div>
-        </div>
-        <div style="margin-top:12px;">
-            <div class="member-stack member-stack-board">
-            {% for member in project_memberships %}
-                <div class="member-avatar-shell">
-                    <div class="proj-ava proj-ava-board" style="background:var(--accent);" data-avatar-user-id="{{ member.user.id }}" data-avatar-initials="{{ member.user.initials }}">{% if member.user.avatar_url %}<img src="{{ member.user.avatar_url }}" alt="{{ member.user.display_name }}" class="avatar-media avatar-media-cover">{% else %}{{ member.user.initials }}{% endif %}</div>
-                    <div class="member-hover-card">
-                        <div class="member-hover-name">{{ member.user.display_name }}{% if member.is_current_user %} (You){% endif %}</div>
-                        <div class="member-hover-role">{{ member.role }}</div>
+    <div class="project-board-layout">
+        <div class="project-board-main">
+            <div class="panel-card fade-in project-board-main-card">
+                <div class="section-hdr">
+                    <div>
+                        <div class="panel-card-title" style="margin-bottom:4px;"><i class="bi bi-kanban" style="color:var(--accent);"></i> Task Board</div>
+                        <p class="project-board-section-copy">Organize work across stages and move tasks as progress changes.</p>
                     </div>
                 </div>
-            {% empty %}
-                <p style="margin:0;color:var(--muted);font-size:13px;">No team members assigned yet.</p>
-            {% endfor %}
+                <div class="kanban-board kanban-board-match">
+                    {% for column in board_columns %}
+                    <section class="kanban-column match-column" data-status="{{ column.key }}">
+                        <div class="kanban-column-head match-column-head">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="board-status-dot {{ column.key }}"></span>
+                                <h5>{{ column.label }}</h5>
+                            </div>
+                            <span class="pill-count column-count">{{ column.tasks|length }}</span>
+                        </div>
+
+                        <div class="kanban-list match-list" data-dropzone="{{ column.key }}">
+                            {% for task in column.tasks %}
+                            <article class="kanban-task match-task {% if task.status == 'completed' %}is-completed{% endif %}"
+                                draggable="true" data-task-id="{{ task.id }}" data-status="{{ task.status }}"
+                                data-progress-value="{{ task.progress_value }}" data-comments="{{ task.comment_count }}"
+                                data-detail-url="{% url 'task_detail' task.id %}"
+                                data-update-url="{% url 'update_task_status' task.id %}"
+                                data-full-update-url="{% url 'update_task' task.id %}"
+                                data-comment-url="{% url 'add_task_comment' task.id %}"
+                                data-delete-url="{% url 'delete_task' task.id %}">
+                                <div class="match-task-head">
+                                    <div class="match-task-title-wrap">
+                                        <div class="match-task-title">{{ task.title }}</div>
+                                        <div class="match-task-project"><i class="bi bi-folder"></i> {{ task.project.name }}</div>
+                                    </div>
+
+                                    <div class="dropdown">
+                                        <button type="button" class="match-task-menu" data-bs-toggle="dropdown"
+                                            aria-expanded="false" aria-label="Task options">
+                                            <i class="bi bi-three-dots-vertical"></i>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark-custom board-task-dropdown">
+                                            {% if can_manage_project %}
+                                            <li><button type="button" class="dropdown-item task-edit-trigger"><i
+                                                        class="bi bi-pencil"></i> Edit</button></li>
+                                            {% endif %}
+                                            <li><button type="button" class="dropdown-item task-move-trigger"><i
+                                                        class="bi bi-arrow-right"></i> Move</button></li>
+                                            {% if can_manage_project %}
+                                            <li>
+                                                <hr class="dropdown-divider">
+                                            </li>
+                                            <li><button type="button" class="dropdown-item text-danger task-delete-trigger"><i
+                                                        class="bi bi-trash"></i> Delete</button></li>
+                                            {% endif %}
+                                        </ul>
+                                    </div>
+                                </div>
+
+                                <div class="match-task-footer">
+                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                        <span class="priority-pill {{ task.priority }}">{{ task.priority|upper }}</span>
+                                        <div class="match-task-avatars">
+                                            {% if task.assigned_to %}
+                                            <div class="proj-ava" style="background:var(--accent);" data-avatar-user-id="{{ task.assigned_to.id }}" data-avatar-initials="{{ task.assigned_to.initials }}">{% if task.assigned_to.avatar_url %}<img src="{{ task.assigned_to.avatar_url }}" alt="{{ task.assigned_to.display_name }}" class="avatar-media avatar-media-cover">{% else %}{{ task.assigned_to.initials }}{% endif %}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+
+                                    <div class="match-task-meta">
+                                        <span><i class="bi bi-calendar3"></i> {% if task.due_date %}{{ task.due_date|date:"M j" }}{%
+                                            else %}No date{% endif %}</span>
+                                        {% if task.status == 'completed' %}
+                                        <span class="match-done"><i class="bi bi-check-circle-fill"></i> Done</span>
+                                        {% else %}
+                                        <span><i class="bi bi-chat"></i> {{ task.comment_count }}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </article>
+                            {% endfor %}
+                        </div>
+                    </section>
+                    {% endfor %}
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="kanban-board kanban-board-match">
-        {% for column in board_columns %}
-        <section class="kanban-column match-column" data-status="{{ column.key }}">
-            <div class="kanban-column-head match-column-head">
-                <div class="d-flex align-items-center gap-2">
-                    <span class="board-status-dot {{ column.key }}"></span>
-                    <h5>{{ column.label }}</h5>
+        <aside class="project-board-sidebar">
+            <div class="panel-card fade-in">
+                <div class="section-hdr">
+                    <div>
+                        <div class="panel-card-title" style="margin-bottom:4px;"><i class="bi bi-folder2-open" style="color:var(--accent2);"></i> Project Files</div>
+                        <p class="project-board-section-copy">Shared assets and handoff files for this project.</p>
+                    </div>
                 </div>
-                <span class="pill-count column-count">{{ column.tasks|length }}</span>
+                {% if can_manage_project %}
+                <form method="post" action="{% url 'upload_project_file' project.id %}" enctype="multipart/form-data" class="board-inline-form board-file-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{% url 'project_board' project.id %}">
+                    <div class="board-file-picker">
+                        <input type="file" name="project_file" class="board-file-input" id="projectFileInput" required>
+                        <label for="projectFileInput" class="board-file-label">
+                            <span class="board-file-button">Choose File</span>
+                            <span class="board-file-name" data-file-name>No file chosen</span>
+                        </label>
+                    </div>
+                    <button type="submit" class="btn-primary-custom">Upload File</button>
+                </form>
+                {% endif %}
+                <div class="board-mini-list">
+                    {% for item in project_files|slice:":4" %}
+                    <a href="{% url 'download_project_file' item.id %}" class="board-mini-item board-mini-link">
+                        <div>
+                            <div class="board-mini-title">{{ item.file|cut:"project_files/" }}</div>
+                            <div class="board-mini-copy">Uploaded {% if item.uploaded_by %}by {{ item.uploaded_by.display_name }}{% else %}by system{% endif %}</div>
+                        </div>
+                        <span class="task-card-open"><span>Download</span><i class="bi bi-download"></i></span>
+                    </a>
+                    {% empty %}
+                    <p style="margin:0;color:var(--muted);font-size:13px;">No project files uploaded yet.</p>
+                    {% endfor %}
+                </div>
+                <a href="{% url 'project_budget' project.id %}" class="btn-ghost board-sidebar-link">{% if can_view_project_budget %}Open Budget Management{% else %}View My Payments{% endif %}</a>
             </div>
 
-            <div class="kanban-list match-list" data-dropzone="{{ column.key }}">
-                {% for task in column.tasks %}
-                <article class="kanban-task match-task {% if task.status == 'completed' %}is-completed{% endif %}"
-                    draggable="true" data-task-id="{{ task.id }}" data-status="{{ task.status }}"
-                    data-progress-value="{{ task.progress_value }}" data-comments="{{ task.comment_count }}"
-                    data-detail-url="{% url 'task_detail' task.id %}"
-                    data-update-url="{% url 'update_task_status' task.id %}"
-                    data-full-update-url="{% url 'update_task' task.id %}"
-                    data-comment-url="{% url 'add_task_comment' task.id %}"
-                    data-delete-url="{% url 'delete_task' task.id %}">
-                    <div class="match-task-head">
-                        <div class="match-task-title-wrap">
-                            <div class="match-task-title">{{ task.title }}</div>
-                            <div class="match-task-project"><i class="bi bi-folder"></i> {{ task.project.name }}</div>
-                        </div>
-
-                        <div class="dropdown">
-                            <button type="button" class="match-task-menu" data-bs-toggle="dropdown"
-                                aria-expanded="false" aria-label="Task options">
-                                <i class="bi bi-three-dots-vertical"></i>
-                            </button>
-                            <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark-custom board-task-dropdown">
-                                {% if can_manage_project %}
-                                <li><button type="button" class="dropdown-item task-edit-trigger"><i
-                                            class="bi bi-pencil"></i> Edit</button></li>
-                                {% endif %}
-                                <li><button type="button" class="dropdown-item task-move-trigger"><i
-                                            class="bi bi-arrow-right"></i> Move</button></li>
-                                {% if can_manage_project %}
-                                <li>
-                                    <hr class="dropdown-divider">
-                                </li>
-                                <li><button type="button" class="dropdown-item text-danger task-delete-trigger"><i
-                                            class="bi bi-trash"></i> Delete</button></li>
-                                {% endif %}
-                            </ul>
-                        </div>
+            <div class="panel-card fade-in">
+                <div class="section-hdr">
+                    <div>
+                        <div class="panel-card-title" style="margin-bottom:4px;"><i class="bi bi-people" style="color:var(--accent2);"></i> Team Members</div>
+                        <p class="project-board-section-copy">Quick access to everyone collaborating on this project.</p>
                     </div>
-
-                    <div class="match-task-footer">
-                        <div class="d-flex align-items-center gap-2 flex-wrap">
-                            <span class="priority-pill {{ task.priority }}">{{ task.priority|upper }}</span>
-                            <div class="match-task-avatars">
-                                {% if task.assigned_to %}
-                                <div class="proj-ava" style="background:var(--accent);" data-avatar-user-id="{{ task.assigned_to.id }}" data-avatar-initials="{{ task.assigned_to.initials }}">{% if task.assigned_to.avatar_url %}<img src="{{ task.assigned_to.avatar_url }}" alt="{{ task.assigned_to.display_name }}" class="avatar-media avatar-media-cover">{% else %}{{ task.assigned_to.initials }}{% endif %}</div>
-                                {% endif %}
+                </div>
+                <div class="project-board-team-list">
+                    <div class="member-stack member-stack-board">
+                    {% for member in project_memberships %}
+                        <div class="member-avatar-shell">
+                            <div class="proj-ava proj-ava-board" style="background:var(--accent);" data-avatar-user-id="{{ member.user.id }}" data-avatar-initials="{{ member.user.initials }}">{% if member.user.avatar_url %}<img src="{{ member.user.avatar_url }}" alt="{{ member.user.display_name }}" class="avatar-media avatar-media-cover">{% else %}{{ member.user.initials }}{% endif %}</div>
+                            <div class="member-hover-card">
+                                <div class="member-hover-name">{{ member.user.display_name }}{% if member.is_current_user %} (You){% endif %}</div>
+                                <div class="member-hover-role">{{ member.role }}</div>
                             </div>
                         </div>
-
-                        <div class="match-task-meta">
-                            <span><i class="bi bi-calendar3"></i> {% if task.due_date %}{{ task.due_date|date:"M j" }}{%
-                                else %}No date{% endif %}</span>
-                            {% if task.status == 'completed' %}
-                            <span class="match-done"><i class="bi bi-check-circle-fill"></i> Done</span>
-                            {% else %}
-                            <span><i class="bi bi-chat"></i> {{ task.comment_count }}</span>
-                            {% endif %}
-                        </div>
+                    {% empty %}
+                        <p style="margin:0;color:var(--muted);font-size:13px;">No team members assigned yet.</p>
+                    {% endfor %}
                     </div>
-                </article>
-                {% endfor %}
+                </div>
             </div>
-        </section>
-        {% endfor %}
+        </aside>
     </div>
 </div>
 

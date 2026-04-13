@@ -97,6 +97,13 @@ class Project(models.Model):
     start_date = models.DateField()
     end_date = models.DateField(blank=True, null=True)
     budget = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    owner = models.ForeignKey(
+        Users,
+        on_delete=models.SET_NULL,
+        related_name='owned_projects',
+        blank=True,
+        null=True,
+    )
     manager = models.ForeignKey(
         Users,
         on_delete=models.SET_NULL,
@@ -132,6 +139,11 @@ class ProjectMember(models.Model):
     user = models.ForeignKey(Users, on_delete=models.CASCADE, related_name='project_memberships')
     role = models.CharField(max_length=100, blank=True, null=True)
     is_manager = models.BooleanField(default=False)
+    assignment_status = models.CharField(max_length=20, default='active')
+    allocation_hours_per_day = models.DecimalField(max_digits=4, decimal_places=1, default=0)
+    assignment_start_date = models.DateField(blank=True, null=True)
+    assignment_end_date = models.DateField(blank=True, null=True)
+    assignment_notes = models.TextField(blank=True, null=True)
     joined_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
@@ -217,16 +229,158 @@ class ProjectFile(models.Model):
         ordering = ['-uploaded_at']
 
 
+class ExpenseCategory(models.Model):
+    id = models.AutoField(primary_key=True)
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='expense_categories')
+    name = models.CharField(max_length=120)
+    is_fixed = models.BooleanField(default=False)
+    created_by = models.ForeignKey(
+        Users,
+        on_delete=models.SET_NULL,
+        related_name='created_expense_categories',
+        blank=True,
+        null=True,
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = 'expense_categories'
+        ordering = ['name']
+        unique_together = ('project', 'name')
+
+
 class Expense(models.Model):
+    TYPE_EXPENSE = 'expense'
+    TYPE_INCOME = 'income'
+
+    STATUS_PAID = 'paid'
+    STATUS_PENDING = 'pending'
+    STATUS_CANCELLED = 'cancelled'
+    STATUS_OVERDUE = 'overdue'
+
+    TRANSACTION_TYPE_CHOICES = [
+        (TYPE_EXPENSE, 'Expense'),
+        (TYPE_INCOME, 'Income'),
+    ]
+
+    PAYMENT_STATUS_CHOICES = [
+        (STATUS_PAID, 'Paid'),
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_CANCELLED, 'Cancelled'),
+        (STATUS_OVERDUE, 'Overdue'),
+    ]
+
     id = models.AutoField(primary_key=True)
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='expenses')
+    category = models.ForeignKey(
+        ExpenseCategory,
+        on_delete=models.SET_NULL,
+        related_name='expenses',
+        blank=True,
+        null=True,
+    )
+    created_by = models.ForeignKey(
+        Users,
+        on_delete=models.SET_NULL,
+        related_name='created_expenses',
+        blank=True,
+        null=True,
+    )
+    assigned_user = models.ForeignKey(
+        Users,
+        on_delete=models.SET_NULL,
+        related_name='assigned_finance_transactions',
+        blank=True,
+        null=True,
+    )
     amount = models.DecimalField(max_digits=10, decimal_places=2)
+    title = models.CharField(max_length=255, blank=True, null=True)
     description = models.CharField(max_length=255)
+    transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPE_CHOICES, default=TYPE_EXPENSE)
+    reference_id = models.CharField(max_length=120, blank=True, null=True)
+    status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default=STATUS_PENDING)
+    issue_date = models.DateField(blank=True, null=True)
+    paid_date = models.DateField(blank=True, null=True)
+    note = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
         db_table = 'expenses'
         ordering = ['-created_at']
+
+    @property
+    def display_title(self):
+        return self.title or self.description
+
+    @property
+    def category_name(self):
+        return self.category.name if self.category else 'General'
+
+    @property
+    def is_salary_payment(self):
+        return bool(self.assigned_user_id) or self.category_name.lower() == 'salary'
+
+
+class EmployeeProfile(models.Model):
+    TYPE_FULL_TIME = 'full_time'
+    TYPE_PART_TIME = 'part_time'
+    TYPE_CONTRACT = 'contract'
+    TYPE_INTERN = 'intern'
+
+    STATUS_ACTIVE = 'active'
+    STATUS_ON_LEAVE = 'on_leave'
+    STATUS_INACTIVE = 'inactive'
+
+    EMPLOYEE_TYPE_CHOICES = [
+        (TYPE_FULL_TIME, 'Full Time'),
+        (TYPE_PART_TIME, 'Part Time'),
+        (TYPE_CONTRACT, 'Contract'),
+        (TYPE_INTERN, 'Intern'),
+    ]
+
+    EMPLOYMENT_STATUS_CHOICES = [
+        (STATUS_ACTIVE, 'Active'),
+        (STATUS_ON_LEAVE, 'On Leave'),
+        (STATUS_INACTIVE, 'Inactive'),
+    ]
+
+    user = models.OneToOneField(Users, on_delete=models.CASCADE, related_name='employee_profile')
+    employee_type = models.CharField(max_length=20, choices=EMPLOYEE_TYPE_CHOICES, default=TYPE_FULL_TIME)
+    salary = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    join_date = models.DateField(default=timezone.localdate)
+    status = models.CharField(max_length=20, choices=EMPLOYMENT_STATUS_CHOICES, default=STATUS_ACTIVE)
+
+    class Meta:
+        db_table = 'employee_profiles'
+        ordering = ['join_date', 'user_id']
+
+
+class EmployeePayroll(models.Model):
+    STATUS_PAID = 'paid'
+    STATUS_PENDING = 'pending'
+    STATUS_PROCESSING = 'processing'
+
+    STATUS_CHOICES = [
+        (STATUS_PAID, 'Paid'),
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_PROCESSING, 'Processing'),
+    ]
+
+    employee = models.ForeignKey(EmployeeProfile, on_delete=models.CASCADE, related_name='payroll_entries')
+    month = models.DateField()
+    base_salary = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    bonus = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    deduction = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    payment_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = 'employee_payroll'
+        ordering = ['-month', '-created_at']
+
+    @property
+    def net_pay(self):
+        return (self.base_salary or 0) + (self.bonus or 0) - (self.deduction or 0)
 
 
 class TaskComment(models.Model):

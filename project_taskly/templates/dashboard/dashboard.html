@@ -77,6 +77,32 @@
   </div>
 </div>
 
+{% if admin_snapshot %}
+<div class="panel-card fade-in" style="margin-bottom:16px;">
+  <div class="section-hdr">
+    <div class="panel-card-title" style="margin-bottom:0;"><i class="bi bi-shield-check" style="color:var(--accent);"></i> Admin Overview</div>
+  </div>
+  <div class="board-summary-grid" style="margin:0;">
+    <div class="board-budget-stat">
+      <span>Projects</span>
+      <strong>{{ admin_snapshot.projects }}</strong>
+    </div>
+    <div class="board-budget-stat">
+      <span>Users</span>
+      <strong>{{ admin_snapshot.users }}</strong>
+    </div>
+    <div class="board-budget-stat">
+      <span>Tasks</span>
+      <strong>{{ admin_snapshot.tasks }}</strong>
+    </div>
+    <div class="board-budget-stat">
+      <span>Memberships</span>
+      <strong>{{ admin_snapshot.memberships }}</strong>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <div class="row g-3">
   <div class="col-12 col-xl-8">
     <div class="row g-3">
@@ -176,12 +202,53 @@
           <div class="panel-card-title"><i class="bi bi-pie-chart" style="color:var(--accent);"></i> Task Breakdown
           </div>
           <div class="donut-wrap" style="display:block;">
+            <div class="dashboard-bar-chart" id="commitChart" data-chart-values="{{ dashboard_chart_data|join:',' }}"></div>
             <div style="display:grid;gap:10px;">
               <div class="legend-item"><span class="legend-dot" style="background:var(--low);"></span><span style="color:var(--muted);">Completed</span><span class="legend-val" style="color:var(--low);">{{ completed_tasks }}</span></div>
               <div class="legend-item"><span class="legend-dot" style="background:var(--accent);"></span><span style="color:var(--muted);">In Progress</span><span class="legend-val" style="color:var(--accent);">{{ in_progress_tasks }}</span></div>
               <div class="legend-item"><span class="legend-dot" style="background:var(--med);"></span><span style="color:var(--muted);">Pending</span><span class="legend-val" style="color:var(--med);">{{ pending_tasks }}</span></div>
               <div class="legend-item"><span class="legend-dot" style="background:var(--high);"></span><span style="color:var(--muted);">Overdue</span><span class="legend-val" style="color:var(--high);">{{ overdue_tasks }}</span></div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 fade-in">
+        <div class="panel-card">
+          <div class="panel-card-title"><i class="bi bi-wallet2" style="color:var(--accent2);"></i> Budget Overview</div>
+          <div class="board-budget-grid" style="margin-top:14px;">
+            <div class="board-budget-stat">
+              <span>Total Budget</span>
+              <strong>${{ dashboard_budget_total }}</strong>
+            </div>
+            <div class="board-budget-stat">
+              <span>Actual Spend</span>
+              <strong>${{ dashboard_budget_actual }}</strong>
+            </div>
+            <div class="board-budget-stat">
+              <span>Remaining</span>
+              <strong>${{ dashboard_budget_remaining }}</strong>
+            </div>
+          </div>
+          <div class="progress-track" style="margin-top:14px;">
+            <div class="progress-fill dashboard-progress-fill" data-progress-width="{{ dashboard_budget_usage_percent }}"></div>
+          </div>
+          <div class="project-progress-label" style="margin-top:8px;">
+            <span>Overall budget usage</span>
+            <strong>{{ dashboard_budget_usage_percent }}%</strong>
+          </div>
+          <div class="board-mini-list" style="margin-top:14px;">
+            {% for item in dashboard_budget_rows %}
+            <a href="{% url 'project_budget' item.project.id %}" class="board-mini-item board-mini-link">
+              <div>
+                <div class="board-mini-title">{{ item.project.name }}</div>
+                <div class="board-mini-copy">${{ item.actual }} spent of ${{ item.project.budget }}</div>
+              </div>
+              <strong>{{ item.usage_percent }}%</strong>
+            </a>
+            {% empty %}
+            <p style="margin:0;color:var(--muted);font-size:13px;">No project budgets available yet.</p>
+            {% endfor %}
           </div>
         </div>
       </div>
@@ -223,6 +290,28 @@
           {% endfor %}
         </div>
       </div>
+
+      {% if timeline_projects %}
+      <div class="col-12 fade-in">
+        <div class="panel-card">
+          <div class="panel-card-title"><i class="bi bi-calendar-range" style="color:var(--accent2);"></i> Manager Timeline</div>
+          <div class="timeline-list">
+            {% for item in timeline_projects %}
+            <div class="timeline-item">
+              <div class="timeline-copy">
+                <div class="timeline-title">{{ item.project.name }}</div>
+                <div class="timeline-dates">{{ item.start_label }} to {{ item.end_label }}</div>
+              </div>
+              <div class="timeline-bar">
+                <div class="timeline-bar-fill" data-progress-width="{{ item.elapsed_percent }}"></div>
+              </div>
+              <div class="timeline-percent">{{ item.elapsed_percent }}%</div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
 
       <div class="col-12 fade-in">
         <div class="panel-card">

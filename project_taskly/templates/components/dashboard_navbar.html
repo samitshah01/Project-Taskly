@@ -11,6 +11,8 @@
         <a href="{% url 'dashboard' %}" class="nav-item-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"><i class="bi bi-grid-1x2"></i>Dashboard</a>
         <a href="{% url 'projects' %}" class="nav-item-link {% if request.resolver_match.url_name == 'projects' %}active{% endif %}"><i class="bi bi-folder2"></i> Projects <span class="nav-badge">{{ sidebar_project_count }}</span></a>
         <a href="{% url 'tasks' %}" class="nav-item-link {% if request.resolver_match.url_name == 'tasks' %}active{% endif %}"><i class="bi bi-check2-circle"></i> My Tasks <span class="nav-badge">{{ sidebar_task_count }}</span></a>
+        <a href="{{ finance_nav_url }}" class="nav-item-link {% if request.resolver_match.url_name == 'budget_tracking' or request.resolver_match.url_name == 'project_budget' %}active{% endif %}"><i class="bi bi-wallet2"></i> Budget</a>
+        <a href="{% url 'employees' %}" class="nav-item-link {% if request.resolver_match.url_name == 'employees' %}active{% endif %}"><i class="bi bi-people"></i> Employees</a>
     </div>
 
     <div class="sidebar-section">
