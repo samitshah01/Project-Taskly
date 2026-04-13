@@ -128,66 +128,57 @@ document.addEventListener("DOMContentLoaded", function () {
     fixStatCards();
     window.addEventListener("resize", fixStatCards);
 
-    const chart = document.getElementById("commitChart");
+    const chart = document.getElementById("taskBreakdownChart");
     if (chart) {
-        const chartLabels = ["Completed", "In Progress", "Pending", "Overdue"];
-        const chartColors = ["var(--low)", "var(--accent)", "var(--med)", "var(--high)"];
+        const chartColors = ["var(--low)", "var(--accent)", "var(--med)"];
         const rawData = (chart.dataset.chartValues || "")
             .split(",")
             .map(value => Number(value || 0))
-            .filter(value => !Number.isNaN(value));
-        const safeData = rawData.length ? rawData : [0, 0, 0, 0];
-        const validData = safeData.filter(v => typeof v === "number" && !isNaN(v));
-        const renderEmptyChart = () => {
-            const emptyMessage = document.createElement("div");
-            emptyMessage.textContent = "No data available";
-            emptyMessage.style.cssText = "width:100%;text-align:center;padding:20px;color:var(--text-secondary);";
-            chart.appendChild(emptyMessage);
-        };
+            .filter(value => !Number.isNaN(value))
+            .slice(0, 3);
+        const safeData = rawData.length ? rawData : [0, 0, 0];
+        const total = safeData.reduce((sum, value) => sum + value, 0);
+        const totalLabel = document.createElement("div");
+        totalLabel.className = "task-donut-total";
+        totalLabel.textContent = String(total);
+        chart.appendChild(totalLabel);
 
-        if (validData.length > 0) {
-            const max = Math.max(...validData);
-            if (isFinite(max) && max > 0) {
-                validData.forEach((value, index) => {
-                    const item = document.createElement("div");
-                    item.className = "dashboard-bar-chart-item";
-
-                    const rail = document.createElement("div");
-                    rail.className = "dashboard-bar-chart-rail";
-
-                    const bar = document.createElement("div");
-                    bar.className = "dashboard-bar-chart-bar";
-                    bar.style.height = `${Math.max(8, (value / max) * 100)}%`;
-                    bar.style.background = `linear-gradient(180deg, ${chartColors[index] || "var(--accent)"}, rgba(255,255,255,0.08))`;
-                    bar.title = `${chartLabels[index] || "Value"}: ${value}`;
-                    bar.addEventListener("mouseenter", () => {
-                        bar.style.opacity = ".82";
-                        bar.style.transform = "translateY(-2px)";
-                    });
-                    bar.addEventListener("mouseleave", () => {
-                        bar.style.opacity = "1";
-                        bar.style.transform = "translateY(0)";
-                    });
-
-                    const meta = document.createElement("div");
-                    meta.className = "dashboard-bar-chart-meta";
-                    meta.innerHTML = `
-                        <span class="dashboard-bar-chart-label">${chartLabels[index] || "Metric"}</span>
-                        <span class="dashboard-bar-chart-value">${value}</span>
-                    `;
-
-                    rail.appendChild(bar);
-                    item.appendChild(rail);
-                    item.appendChild(meta);
-                    chart.appendChild(item);
-                });
-            } else {
-                renderEmptyChart();
-            }
-        } else {
-            renderEmptyChart();
+        if (total <= 0) {
+            chart.classList.add("is-empty");
+            return;
         }
+
+        let offset = 0;
+        const segments = safeData
+            .map((value, index) => {
+                const start = offset;
+                const portion = value / total;
+                offset += portion;
+                return `${chartColors[index]} ${start}turn ${offset}turn`;
+            })
+            .join(", ");
+
+        chart.style.background = `
+            radial-gradient(circle at center, #171b27 0 43%, transparent 44%),
+            conic-gradient(from -90deg, ${segments})
+        `;
     }
+
+    document.querySelectorAll(".dashboard-click-card[data-href]").forEach(card => {
+        const href = card.dataset.href;
+        if (!href) return;
+
+        card.addEventListener("click", event => {
+            if (event.target.closest("a, button, input, select, textarea, label")) return;
+            window.location.href = href;
+        });
+
+        card.addEventListener("keydown", event => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            window.location.href = href;
+        });
+    });
 
     // Projects Page
     const filterPills = document.querySelectorAll(".filter-pill");
@@ -427,6 +418,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if (financeSubmitButton) financeSubmitButton.textContent = "Save Transaction";
         if (financeEntryKindInput) financeEntryKindInput.value = "expense";
         if (financeProjectInput && financeProjectInput.value === "") financeProjectInput.value = financeProjectInput.defaultValue || "";
+        if (financeReferenceInput) financeReferenceInput.value = "Will be generated automatically";
         syncFinanceNextUrl();
         syncFinanceEntryMode();
     }
@@ -465,7 +457,7 @@ document.addEventListener("DOMContentLoaded", function () {
             if (financeStatusInput) financeStatusInput.value = button.dataset.status || "pending";
             if (financeIssueDateInput) financeIssueDateInput.value = button.dataset.issueDate || "";
             if (financePaidDateInput) financePaidDateInput.value = button.dataset.paidDate || "";
-            if (financeReferenceInput) financeReferenceInput.value = button.dataset.referenceId || "";
+            if (financeReferenceInput) financeReferenceInput.value = button.dataset.referenceId || "Will be generated automatically";
             if (financeDescriptionInput) financeDescriptionInput.value = button.dataset.description || "";
             syncFinanceNextUrl();
             syncFinanceEntryMode(button.dataset.assignedUserId || "");

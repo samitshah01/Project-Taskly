@@ -1,0 +1,274 @@
+{% extends 'components/dashboard_base.html' %}
+
+{% block title %}Income - Taskly{% endblock %}
+
+{% block dashboard_content %}
+<div class="main-area workspace-page">
+    <section class="workspace-shell income-page-shell">
+        <div class="workspace-shell-header">
+            <div>
+                <div class="board-breadcrumb">
+                    <a href="{% url 'dashboard' %}">Dashboard</a>
+                    <span>/</span>
+                    <span>Income</span>
+                </div>
+                <div class="workspace-heading-row">
+                    <div class="workspace-heading-copy">
+                        <span class="workspace-kicker">Financial Analytics</span>
+                        <h1 class="workspace-title">Profit &amp; Loss</h1>
+                        <p class="workspace-copy">Capture and track income, expenses, and profit performance across the projects you manage.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <section class="workspace-panel workspace-panel-tall income-hero-panel">
+            <div class="workspace-panel-head income-hero-head">
+                <div>
+                    <div class="workspace-panel-title-row">
+                        <h2 class="workspace-panel-title">Profit &amp; Loss</h2>
+                    </div>
+                    <p class="workspace-panel-copy">A month-by-month comparison of revenue, expense load, and resulting profit.</p>
+                </div>
+
+                <form method="get" class="income-hero-filters">
+                    <div class="workspace-search income-hero-search">
+                        <i class="bi bi-search"></i>
+                        <input type="search" name="search" class="form-control" placeholder="Search..." value="{{ income_filters.search }}">
+                    </div>
+                    <select name="project" class="form-select">
+                        <option value="">All projects</option>
+                        {% for project in income_project_options %}
+                        <option value="{{ project.id }}" {% if income_filters.project == project.id|stringformat:'s' %}selected{% endif %}>{{ project.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <select name="status" class="form-select">
+                        <option value="">All statuses</option>
+                        {% for value, label in income_status_choices %}
+                        <option value="{{ value }}" {% if income_filters.status == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="income-hero-actions">
+                        <button type="submit" class="btn-ghost"><i class="bi bi-funnel"></i> Apply</button>
+                        <a href="{% url 'income_visualization' %}" class="btn-ghost">Reset</a>
+                    </div>
+                </form>
+            </div>
+
+            <div class="income-dashboard-grid">
+                <div class="income-chart-shell">
+                    <div class="income-plot-area">
+                        <div class="income-grid-lines">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
+
+                        <div class="income-bars">
+                            {% for item in income_pnl_chart_rows %}
+                            <div class="income-month-group">
+                                {% if item.show_profit_marker %}
+                                <div class="income-profit-marker" style="bottom: {{ item.profit_point }}%;">
+                                    <span>{{ item.profit|floatformat:0 }}</span>
+                                </div>
+                                {% endif %}
+                                <div class="income-bar-stack">
+                                    <div class="income-bar income-bar-expense" style="height: {{ item.expense_height }}%;"></div>
+                                    <div class="income-bar income-bar-income" style="height: {{ item.income_height }}%;"></div>
+                                </div>
+                                <span class="income-month-label">{{ item.label }}</span>
+                            </div>
+                            {% empty %}
+                            <p class="workspace-empty-inline">No chart data available yet.</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="income-legend-row">
+                        <span><i class="bi bi-square-fill income-legend-dot income-legend-income"></i> Net Income</span>
+                        <span><i class="bi bi-square-fill income-legend-dot income-legend-expense"></i> Expenses</span>
+                        <span><i class="bi bi-circle-fill income-legend-dot income-legend-profit"></i> Profit</span>
+                    </div>
+                </div>
+
+                <aside class="income-summary-stack">
+                    <article class="income-summary-card">
+                        <div class="income-summary-head">
+                            <span>Total Revenue</span>
+                            <i class="bi bi-currency-dollar"></i>
+                        </div>
+                        <strong>${{ income_month_total|floatformat:0 }}</strong>
+                        <small class="{% if income_revenue_change >= 0 %}is-positive{% else %}is-negative{% endif %}">
+                            {% if income_revenue_change >= 0 %}+{% endif %}{{ income_revenue_change }}% from last month
+                        </small>
+                    </article>
+
+                    <article class="income-summary-card">
+                        <div class="income-summary-head">
+                            <span>Total Expenses</span>
+                            <i class="bi bi-receipt"></i>
+                        </div>
+                        <strong>${{ income_month_expense_total|floatformat:0 }}</strong>
+                        <small class="{% if income_expense_change <= 0 %}is-positive{% else %}is-negative{% endif %}">
+                            {% if income_expense_change >= 0 %}+{% endif %}{{ income_expense_change }}% from last month
+                        </small>
+                    </article>
+
+                    <article class="income-summary-card">
+                        <div class="income-summary-head">
+                            <span>Total Profit</span>
+                            <i class="bi bi-activity"></i>
+                        </div>
+                        <strong>${{ income_month_profit_total|floatformat:0 }}</strong>
+                        <small class="{% if income_profit_change >= 0 %}is-positive{% else %}is-negative{% endif %}">
+                            {% if income_profit_change >= 0 %}+{% endif %}{{ income_profit_change }}% from last month
+                        </small>
+                    </article>
+                </aside>
+            </div>
+        </section>
+
+        <div class="workspace-stat-grid budget-theme-two-stats">
+            <article class="workspace-stat-card">
+                <span class="workspace-stat-label">Recorded Revenue</span>
+                <strong class="workspace-stat-value">${{ income_total }}</strong>
+                <span class="workspace-stat-foot">{{ income_transaction_count }} income transaction{{ income_transaction_count|pluralize }}</span>
+            </article>
+            <article class="workspace-stat-card">
+                <span class="workspace-stat-label">Recorded Expenses</span>
+                <strong class="workspace-stat-value">${{ income_total_expense_amount }}</strong>
+                <span class="workspace-stat-foot">Across all filtered finance entries</span>
+            </article>
+            <article class="workspace-stat-card">
+                <span class="workspace-stat-label">Net Profit</span>
+                <strong class="workspace-stat-value">${{ income_total_profit_amount }}</strong>
+                <span class="workspace-stat-foot">Income minus expenses for the current view</span>
+            </article>
+            <article class="workspace-stat-card">
+                <span class="workspace-stat-label">Lead Project</span>
+                <strong class="workspace-stat-value">{% if income_leading_project %}{{ income_leading_project.project_name }}{% else %}-{% endif %}</strong>
+                <span class="workspace-stat-foot">{% if income_leading_project %}${{ income_leading_project.total }} generated{% else %}No project income yet{% endif %}</span>
+            </article>
+        </div>
+
+        <div class="income-visual-grid">
+            <section class="workspace-panel workspace-panel-tall">
+                <div class="workspace-panel-head">
+                    <div>
+                        <div class="workspace-panel-title-row">
+                            <h2 class="workspace-panel-title">Monthly Revenue Snapshot</h2>
+                            <span class="workspace-panel-count">{{ income_monthly_rows|length }}</span>
+                        </div>
+                        <p class="workspace-panel-copy">Quick monthly revenue totals for the latest recorded periods.</p>
+                    </div>
+                </div>
+
+                <div class="income-chart-card">
+                    {% for item in income_monthly_rows %}
+                    <div class="income-bar-item">
+                        <div class="income-bar-track">
+                            <div class="income-bar-fill" data-progress-width="{{ item.percent }}"></div>
+                        </div>
+                        <div class="income-bar-meta">
+                            <span>{{ item.label }}</span>
+                            <strong>${{ item.total }}</strong>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="workspace-empty-inline">No monthly income data is available yet.</p>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <section class="workspace-panel workspace-panel-tall">
+                <div class="workspace-panel-head">
+                    <div>
+                        <div class="workspace-panel-title-row">
+                            <h2 class="workspace-panel-title">Project Contribution</h2>
+                            <span class="workspace-panel-count">{{ income_project_rows|length }}</span>
+                        </div>
+                        <p class="workspace-panel-copy">See which projects are driving the most income right now.</p>
+                    </div>
+                </div>
+
+                <div class="income-project-list">
+                    {% for item in income_project_rows %}
+                    <article class="income-project-card">
+                        <div class="income-project-head">
+                            <div>
+                                <h3>{{ item.project_name }}</h3>
+                                <p>{{ item.count }} transaction{{ item.count|pluralize }}</p>
+                            </div>
+                            <strong>${{ item.total }}</strong>
+                        </div>
+                        <div class="list-progress-track">
+                            <div class="list-progress-fill income-project-fill" data-progress-width="{{ item.percent }}" data-gradient-start="{{ item.project_color }}"></div>
+                        </div>
+                        <div class="project-progress-label">
+                            <span>Share of top project</span>
+                            <strong>{{ item.percent }}%</strong>
+                        </div>
+                    </article>
+                    {% empty %}
+                    <p class="workspace-empty-inline">No project contribution data is available yet.</p>
+                    {% endfor %}
+                </div>
+            </section>
+        </div>
+
+        <section class="workspace-panel workspace-panel-tall">
+            <div class="workspace-panel-head">
+                <div>
+                    <div class="workspace-panel-title-row">
+                        <h2 class="workspace-panel-title">Income Ledger</h2>
+                        <span class="workspace-panel-count">{{ income_transaction_count }}</span>
+                    </div>
+                    <p class="workspace-panel-copy">Income-only transactions with searchable filters and per-project visibility.</p>
+                </div>
+            </div>
+
+            <div class="workspace-table-shell finance-ledger-shell">
+                <div class="workspace-table-scroll">
+                    <table class="workspace-table finance-table">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Project</th>
+                                <th>Reference</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                                <th>Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in income_rows %}
+                            <tr>
+                                <td>
+                                    <div class="finance-title-cell">
+                                        <div>
+                                            <div class="workspace-cell-strong">{{ item.title }}</div>
+                                            <div class="workspace-project-sub">{{ item.object.note|default:item.object.description|default:"No details added." }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>{{ item.project_name }}</td>
+                                <td>{{ item.reference_id }}</td>
+                                <td>{% if item.paid_date %}{{ item.paid_date|date:"M d, Y" }}{% elif item.issue_date %}{{ item.issue_date|date:"M d, Y" }}{% else %}-{% endif %}</td>
+                                <td><span class="badge {{ item.status_badge_class }}">{{ item.status_label }}</span></td>
+                                <td><span class="finance-table-amount income">+${{ item.amount }}</span></td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6"><p class="workspace-empty-inline">No income transactions matched your current filters.</p></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </section>
+</div>
+{% endblock %}

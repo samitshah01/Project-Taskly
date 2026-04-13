@@ -98,11 +98,6 @@
                         {% endif %}
                     </p>
                 </div>
-                <div class="workspace-view-actions">
-                    <button type="button" class="workspace-view-chip active">
-                        <i class="bi bi-table"></i> List View
-                    </button>
-                </div>
             </div>
 
             <div class="workspace-toolbar">
@@ -164,7 +159,7 @@
                                     <div class="finance-title-cell">
                                         <div>
                                             <div class="workspace-cell-strong">{{ item.title }}</div>
-                                            <div class="workspace-project-sub">{{ item.object.note|default:item.object.description|default:"No details added." }}</div>
+                                            <div class="workspace-project-sub">{{ item.reference_id }} • {{ item.object.note|default:item.object.description|default:"No details added." }}</div>
                                         </div>
                                     </div>
                                 </td>
@@ -284,7 +279,7 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Reference ID</label>
-                                <input type="text" class="form-control" name="reference_id" id="financeReferenceInput" placeholder="TXN-1001">
+                                <input type="text" class="form-control finance-reference-input" name="reference_id" id="financeReferenceInput" value="Will be generated automatically" disabled>
                             </div>
                             <div class="col-12">
                                 <label class="form-label">Description</label>

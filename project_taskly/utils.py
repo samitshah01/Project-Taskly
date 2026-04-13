@@ -11,11 +11,30 @@ from django.conf import settings
 def generate_otp(length=6):
     return ''.join([str(random.randint(0, 9)) for _ in range(length)])
 
-def send_otp_email(email, otp):
-    html_content = render_to_string('emails/otp_email.html', {'otp': otp})
+OTP_EMAIL_CONTENT = {
+    'login': {
+        'subject': 'Verify your Taskly account',
+        'headline': 'Taskly Login Verification',
+        'message': 'Use the following one-time password (OTP) to verify your account and complete sign in.',
+    },
+    'password_reset': {
+        'subject': 'Reset your Taskly password',
+        'headline': 'Taskly Password Reset',
+        'message': 'Use the following one-time password (OTP) to reset your password.',
+    },
+}
+
+
+def send_otp_email(email, otp, purpose='password_reset'):
+    email_content = OTP_EMAIL_CONTENT.get(purpose, OTP_EMAIL_CONTENT['password_reset'])
+    html_content = render_to_string('emails/otp_email.html', {
+        'otp': otp,
+        'email_headline': email_content['headline'],
+        'email_message': email_content['message'],
+    })
 
     msg = EmailMessage()
-    msg['Subject'] = 'Your OTP Code'
+    msg['Subject'] = email_content['subject']
     msg['From'] = settings.DEFAULT_FROM_EMAIL
     msg['To'] = email
     msg.set_content("Your email client does not support HTML")
@@ -31,7 +50,7 @@ def send_otp_email(email, otp):
     except Exception as e:
         print("Error sending OTP:", e)
 
-def create_and_send_otp(email):
+def create_and_send_otp(email, purpose='password_reset'):
     now = timezone.now()
 
     last_otp = PasswordOTP.objects.filter(email=email).order_by('-created_at').first()
@@ -43,7 +62,7 @@ def create_and_send_otp(email):
     expires_at = now + timedelta(minutes=10)
 
     try:
-        send_otp_email(email, otp)
+        send_otp_email(email, otp, purpose=purpose)
 
         PasswordOTP.objects.filter(email=email).delete()
 

@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Your OTP Code</title>
+    <title>{{ email_headline|default:"Your OTP Code" }}</title>
 </head>
 
 <body style="margin:0; padding:0; background-color:#0d0f14; font-family:Arial,sans-serif; color:#ffffff;">
@@ -15,14 +15,14 @@
                     <tr>
                         <td align="center" style="padding-bottom:20px;">
                             <h1 style="margin:0; font-size:24px; font-weight:700; color:#4f7cff;">Taskly OTP
-                                Verification</h1>
+                                {{ email_headline|default:"Verification" }}</h1>
                         </td>
                     </tr>
                     <tr>
                         <td style="padding-bottom:20px; font-size:16px; line-height:1.5; color:#cfd3db;">
                             Hi there,
                             <br><br>
-                            Use the following one-time password (OTP) to reset your password. This OTP is valid for
+                            {{ email_message|default:"Use the following one-time password (OTP)." }} This OTP is valid for
                             <strong style="color:#4f7cff;">10 minutes</strong>.
                         </td>
                     </tr>

@@ -3,7 +3,7 @@ import json
 import os
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError, available_timezones
 from decimal import Decimal, InvalidOperation
-from datetime import date
+from datetime import date, timedelta
 from django.conf import settings
 from django.shortcuts import render, redirect
 from django.contrib import messages
@@ -14,6 +14,7 @@ from django.utils.dateparse import parse_date, parse_datetime
 from django.contrib.auth.hashers import check_password
 from django.views.decorators.csrf import csrf_protect
 from django.db.models import Count, Q, Sum, Case, When, IntegerField
+from django.db.models.functions import TruncMonth
 from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from .models import Users, Project, Task, ActivityLog, ProjectMember, ProjectFile, Expense, ExpenseCategory, EmployeeProfile, EmployeePayroll
@@ -212,7 +213,6 @@ def ensure_default_expense_categories(project, user=None):
             project=project,
             name=name,
             is_fixed=True,
-            created_by=user,
         )
 
 
@@ -225,7 +225,6 @@ def get_salary_category(project, user=None):
         project=project,
         name='Salary',
         is_fixed=True,
-        created_by=user,
     )
 def build_role_badge_class(role_name, is_manager=False):
     if is_manager:
@@ -342,6 +341,16 @@ def get_current_user(request):
     return Users.objects.filter(id=user_id).first()
 
 
+def complete_login_session(request, user, remember=False):
+    request.session.flush()
+    request.session['user_id'] = user.id
+    request.session['user_email'] = user.email
+    request.session['user_role'] = user.role
+    request.session['user_full_name'] = f"{user.first_name or ''} {user.last_name or ''}".strip()
+    request.session['user_username'] = user.username
+    request.session.set_expiry(0 if not remember else 60 * 60 * 24 * 30)
+
+
 def get_status_badge_color(status):
     return {
         'completed': 'var(--low)',
@@ -441,6 +450,27 @@ def build_finance_badge_class(status):
     }.get(status, 'bg-secondary-subtle text-light border border-secondary-subtle')
 
 
+def build_transaction_reference_id(transaction_id):
+    return f"TXN-{int(transaction_id):06d}"
+
+
+def ensure_transaction_reference_id(transaction):
+    if not transaction or not transaction.id:
+        return ""
+
+    expected_reference_id = build_transaction_reference_id(transaction.id)
+    duplicate_exists = bool(
+        transaction.reference_id
+        and Expense.objects.exclude(id=transaction.id).filter(reference_id=transaction.reference_id).exists()
+    )
+
+    if transaction.reference_id != expected_reference_id or duplicate_exists:
+        transaction.reference_id = expected_reference_id
+        transaction.save(update_fields=['reference_id'])
+
+    return transaction.reference_id
+
+
 def build_finance_rows(transactions):
     rows = []
     income_total = Decimal('0')
@@ -448,6 +478,7 @@ def build_finance_rows(transactions):
     salary_total = Decimal('0')
 
     for transaction in transactions:
+        reference_id = ensure_transaction_reference_id(transaction)
         amount = transaction.amount or Decimal('0')
         if transaction.transaction_type == Expense.TYPE_INCOME:
             income_total += amount
@@ -462,7 +493,7 @@ def build_finance_rows(transactions):
             'project_name': transaction.project.name,
             'project_id': transaction.project_id,
             'category_name': transaction.category_name,
-            'reference_id': transaction.reference_id or f'TXN-{transaction.id:04d}',
+            'reference_id': reference_id,
             'issue_date': transaction.issue_date,
             'paid_date': transaction.paid_date,
             'status': transaction.status,
@@ -508,6 +539,37 @@ def ensure_employee_profile(user):
         },
     )
     return profile
+
+
+def build_user_directory_rows(queryset, include_profiles=False):
+    user_list = list(queryset.order_by('first_name', 'last_name', 'username', 'email'))
+    profiles = {}
+    membership_map = {}
+    if include_profiles and user_list:
+        profiles = {profile.user_id: profile for profile in EmployeeProfile.objects.filter(user__in=user_list)}
+    if user_list:
+        membership_map = {directory_user.id: [] for directory_user in user_list}
+        memberships = (
+            ProjectMember.objects.select_related('project')
+            .filter(user__in=user_list)
+            .order_by('-assignment_start_date', '-joined_at')
+        )
+        for membership in memberships:
+            membership_map.setdefault(membership.user_id, []).append(membership)
+
+    rows = []
+    for directory_user in user_list:
+        profile = profiles.get(directory_user.id) if include_profiles else None
+        memberships = membership_map.get(directory_user.id, [])
+        rows.append({
+            'user': directory_user,
+            'profile': profile,
+            'membership_count': len(memberships),
+            'assigned_projects': memberships,
+            'primary_assignment': memberships[0] if memberships else None,
+            'status_badge_class': get_profile_badge_class(profile.status) if profile else '',
+        })
+    return rows
 
 
 def build_dashboard_base_context(request, user):
@@ -618,20 +680,31 @@ def login(request):
         user_password = user.password or ''
 
         if check_password(password, user_password):
-            request.session.flush()
+            remember_login = bool(remember)
 
-            logger.info(f"User logged in successfully: user_id={user.id}")
+            if user.is_email_verified:
+                logger.info(f"User logged in successfully without OTP: user_id={user.id}")
+                complete_login_session(request, user, remember_login)
+                messages.success(request, 'Successfully Logged In.')
+                return redirect('dashboard')
 
-            request.session['user_id'] = user.id
-            request.session['user_email'] = user.email
-            request.session['user_role'] = user.role
-            request.session['user_full_name'] = f"{user.first_name or ''} {user.last_name or ''}".strip()
-            request.session['user_username'] = user.username
+            request.session['pending_email'] = user.email
+            request.session['otp_purpose'] = 'login'
+            request.session['pending_login_user_id'] = user.id
+            request.session['pending_login_remember'] = remember_login
 
-            request.session.set_expiry(0 if not remember else 60 * 60 * 24 * 30)
+            success, msg = create_and_send_otp(user.email, purpose='login')
+            if not success:
+                request.session.pop('pending_email', None)
+                request.session.pop('otp_purpose', None)
+                request.session.pop('pending_login_user_id', None)
+                request.session.pop('pending_login_remember', None)
+                messages.error(request, msg)
+                return render(request, 'pages/login.html')
 
-            messages.success(request, 'Successfully Logged In.')
-            return redirect('dashboard')
+            logger.info(f"Login password verified, OTP sent for user_id={user.id}")
+            messages.success(request, 'We sent a verification code to your email. Enter it to continue.')
+            return redirect('verify_otp')
         else:
             logger.warning(f"Invalid password attempt for user: {identifier}")
             messages.error(request, 'Invalid password.')
@@ -730,13 +803,16 @@ def forgot_password(request):
             return redirect('forgot_password')
 
         try:
-            success, msg = create_and_send_otp(email)
+            success, msg = create_and_send_otp(email, purpose='password_reset')
 
             if not success:
                 messages.error(request, msg)
                 return redirect('forgot_password')
 
             request.session['pending_email'] = email
+            request.session['otp_purpose'] = 'password_reset'
+            request.session.pop('pending_login_user_id', None)
+            request.session.pop('pending_login_remember', None)
             messages.success(request, msg)
             return redirect('verify_otp')
 
@@ -749,8 +825,12 @@ def forgot_password(request):
 
 def verify_otp_view(request):
     email = request.session.get("pending_email")
+    otp_purpose = request.session.get("otp_purpose", "password_reset")
 
     if not email:
+        if otp_purpose == 'login':
+            messages.error(request, "Your login verification session expired. Please sign in again.")
+            return redirect('login')
         messages.error(request, "You must request a password reset first.")
         return redirect('forgot_password')
 
@@ -764,10 +844,34 @@ def verify_otp_view(request):
         is_valid, msg = verify_otp(email, otp)
 
         if is_valid:
+            if otp_purpose == 'login':
+                pending_user_id = request.session.get('pending_login_user_id')
+                remember_login = bool(request.session.get('pending_login_remember', False))
+                user = Users.objects.filter(id=pending_user_id, email__iexact=email).first()
+
+                if not user:
+                    request.session.pop("pending_email", None)
+                    request.session.pop("otp_purpose", None)
+                    request.session.pop("pending_login_user_id", None)
+                    request.session.pop("pending_login_remember", None)
+                    messages.error(request, "Login session expired. Please sign in again.")
+                    return redirect('login')
+
+                if not user.is_email_verified:
+                    user.is_email_verified = True
+                    user.save(update_fields=['is_email_verified'])
+
+                logger.info(f"User logged in successfully after OTP verification: user_id={user.id}")
+                complete_login_session(request, user, remember_login)
+                messages.success(request, "Email verified successfully. Welcome back!")
+                return redirect('dashboard')
+
             messages.success(request, "OTP verified successfully!")
             request.session['reset_email'] = email
             request.session.pop("pending_email", None)
-
+            request.session.pop("otp_purpose", None)
+            request.session.pop("pending_login_user_id", None)
+            request.session.pop("pending_login_remember", None)
             return redirect('reset_password')
         else:
             messages.error(request, msg)
@@ -776,7 +880,9 @@ def verify_otp_view(request):
     masked_email = mask_email(email) if email else ""
 
     return render(request, 'pages/verify_otp.html', {
-        'masked_email': masked_email
+        'masked_email': masked_email,
+        'otp_purpose': otp_purpose,
+        'otp_resend_url': reverse('resend_otp'),
     })
 
 def resend_otp(request):
@@ -786,7 +892,8 @@ def resend_otp(request):
         if not email:
             return JsonResponse({"success": False, "message": "Session expired"})
 
-        success, msg = create_and_send_otp(email)
+        otp_purpose = request.session.get("otp_purpose", "password_reset")
+        success, msg = create_and_send_otp(email, purpose=otp_purpose)
 
         return JsonResponse({
             "success": success,
@@ -973,7 +1080,7 @@ def dashboard(request):
         "recent_activity": recent_activity,
         "team_members": team_members,
         "admin_snapshot": admin_snapshot,
-        "dashboard_chart_data": [completed_tasks, in_progress_tasks, pending_tasks, overdue_tasks],
+        "dashboard_chart_data": [completed_tasks, in_progress_tasks, pending_tasks],
         "timeline_projects": timeline_projects,
         "dashboard_budget_rows": budget_rows[:4],
         "dashboard_budget_total": budget_total,
@@ -1234,7 +1341,6 @@ def project_budget(request, project_id):
 
     transactions = Expense.objects.select_related(
         'project',
-        'created_by',
         'assigned_user',
     ).filter(project=project).order_by('-issue_date', '-created_at')
 
@@ -1367,7 +1473,7 @@ def employees(request):
     if detail_tab not in {'projects', 'details'}:
         detail_tab = 'projects'
 
-    employee_users = Users.objects.all().order_by('first_name', 'last_name', 'username')
+    employee_users = Users.objects.filter(project_memberships__isnull=False).distinct()
     if search_query:
         employee_users = employee_users.filter(
             Q(first_name__icontains=search_query)
@@ -1375,19 +1481,15 @@ def employees(request):
             | Q(username__icontains=search_query)
             | Q(email__icontains=search_query)
             | Q(role__icontains=search_query)
+            | Q(project_memberships__project__name__icontains=search_query)
         )
 
-    user_list = list(employee_users)
-    profiles = {profile.user_id: profile for profile in EmployeeProfile.objects.filter(user__in=user_list)}
-    employee_rows = []
-    for employee_user in user_list:
-        profile = profiles.get(employee_user.id) or ensure_employee_profile(employee_user)
-        employee_rows.append({
-            'user': employee_user,
-            'profile': profile,
-            'salary_display': profile.salary,
-            'status_badge_class': get_profile_badge_class(profile.status),
-        })
+    employee_rows = build_user_directory_rows(employee_users, include_profiles=True)
+    for row in employee_rows:
+        profile = row['profile'] or ensure_employee_profile(row['user'])
+        row['profile'] = profile
+        row['salary_display'] = profile.salary
+        row['status_badge_class'] = get_profile_badge_class(profile.status)
 
     paginator = Paginator(employee_rows, 8)
     page_obj = paginator.get_page(request.GET.get('page'))
@@ -1442,6 +1544,337 @@ def employees(request):
         ],
     })
     return render(request, 'dashboard/employees.html', context)
+
+
+def users(request):
+    if not request.session.get('user_id'):
+        messages.warning(request, "Please login to continue.")
+        return redirect('login')
+
+    user = get_current_user(request)
+    if not user:
+        messages.error(request, "User not found.")
+        request.session.flush()
+        return redirect('login')
+
+    search_query = request.GET.get('search', '').strip()
+    selected_user_id = request.GET.get('user', '').strip()
+
+    all_users = Users.objects.all()
+    if search_query:
+        all_users = all_users.filter(
+            Q(first_name__icontains=search_query)
+            | Q(last_name__icontains=search_query)
+            | Q(username__icontains=search_query)
+            | Q(email__icontains=search_query)
+            | Q(role__icontains=search_query)
+        )
+
+    user_rows = build_user_directory_rows(all_users, include_profiles=True)
+
+    paginator = Paginator(user_rows, 8)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    selected_user = None
+
+    if selected_user_id:
+        selected_user = next((row for row in user_rows if str(row['user'].id) == selected_user_id), None)
+
+    if not selected_user and page_obj.object_list:
+        selected_user = page_obj.object_list[0]
+
+    context = build_dashboard_base_context(request, user)
+    context.update({
+        'user_page_obj': page_obj,
+        'user_search': search_query,
+        'selected_user': selected_user,
+    })
+    return render(request, 'dashboard/users.html', context)
+
+
+def calendar(request):
+    if not request.session.get('user_id'):
+        messages.warning(request, "Please login to continue.")
+        return redirect('login')
+
+    user = get_current_user(request)
+    if not user:
+        messages.error(request, "User not found.")
+        request.session.flush()
+        return redirect('login')
+
+    accessible_projects = list(
+        get_accessible_projects(user)
+        .prefetch_related('tasks__assigned_to', 'project_members__user')
+        .order_by('start_date', 'name')
+    )
+
+    events = []
+    legend_counts = []
+
+    for project in accessible_projects:
+        project_color = project.color or '#4f7cff'
+        member_names = ", ".join(
+            membership.user.display_name
+            for membership in project.project_members.select_related('user').all()[:3]
+        ) or 'Project team'
+
+        project_events_added = 0
+        board_url = reverse('project_board', args=[project.id])
+
+        if project.start_date:
+            events.append({
+                'id': f'project-start-{project.id}',
+                'title': f'{project.name} kickoff',
+                'date': project.start_date.isoformat(),
+                'time': '09:00',
+                'project': project.name,
+                'color': project_color,
+                'type': 'project_start',
+                'meta': 'Project start date',
+                'team': member_names,
+                'url': board_url,
+            })
+            project_events_added += 1
+
+        if project.end_date:
+            events.append({
+                'id': f'project-end-{project.id}',
+                'title': f'{project.name} deadline',
+                'date': project.end_date.isoformat(),
+                'time': '18:00',
+                'project': project.name,
+                'color': project_color,
+                'type': 'project_deadline',
+                'meta': 'Project deadline',
+                'team': member_names,
+                'url': board_url,
+            })
+            project_events_added += 1
+
+        for task in project.tasks.select_related('assigned_to').all():
+            if not task.due_date:
+                continue
+
+            assignee_name = task.assigned_to.display_name if task.assigned_to else 'Unassigned'
+            events.append({
+                'id': f'task-{task.id}',
+                'title': task.title,
+                'date': task.due_date.isoformat(),
+                'time': '17:00',
+                'project': project.name,
+                'color': project_color,
+                'type': 'task_due',
+                'meta': f'Task due · {task.get_status_display()}',
+                'team': assignee_name,
+                'url': board_url,
+            })
+            project_events_added += 1
+
+        legend_counts.append({
+            'project': project,
+            'count': project_events_added,
+        })
+
+    events.sort(key=lambda item: (item['date'], item['time'], item['title']))
+    today = timezone.localdate()
+    upcoming_events = [item for item in events if item['date'] >= today.isoformat()][:8]
+
+    context = build_dashboard_base_context(request, user)
+    context.update({
+        'calendar_today': today.isoformat(),
+        'calendar_events': events,
+        'calendar_upcoming_events': upcoming_events,
+        'calendar_project_legend': [item for item in legend_counts if item['count'] > 0][:6],
+        'calendar_total_events': len(events),
+        'calendar_total_projects': len(accessible_projects),
+    })
+    return render(request, 'dashboard/calendar.html', context)
+
+
+def income_visualization(request):
+    if not request.session.get('user_id'):
+        messages.warning(request, "Please login to continue.")
+        return redirect('login')
+
+    user = get_current_user(request)
+    if not user:
+        messages.error(request, "User not found.")
+        request.session.flush()
+        return redirect('login')
+
+    finance_projects = get_budget_visible_projects(user).order_by('name')
+    if not finance_projects.exists():
+        messages.info(request, 'Create or manage a project budget to view income analytics.')
+        return redirect('projects')
+
+    search_query = request.GET.get('search', '').strip()
+    status_filter = request.GET.get('status', '').strip()
+    project_filter = request.GET.get('project', '').strip()
+
+    finance_entries = Expense.objects.select_related('project').filter(project__in=finance_projects)
+    incomes = finance_entries.filter(transaction_type=Expense.TYPE_INCOME)
+
+    if project_filter:
+        incomes = incomes.filter(project_id=project_filter)
+
+    if status_filter in {choice[0] for choice in Expense.PAYMENT_STATUS_CHOICES}:
+        incomes = incomes.filter(status=status_filter)
+
+    if search_query:
+        incomes = incomes.filter(
+            Q(title__icontains=search_query)
+            | Q(description__icontains=search_query)
+            | Q(reference_id__icontains=search_query)
+            | Q(project__name__icontains=search_query)
+        )
+
+    income_list = list(incomes.order_by('-issue_date', '-created_at'))
+    income_rows, income_total, _, _, income_net_total = build_finance_rows(income_list)
+    paid_income_total = sum(item['amount'] for item in income_rows if item['status'] == Expense.STATUS_PAID)
+    pending_income_total = sum(item['amount'] for item in income_rows if item['status'] != Expense.STATUS_PAID)
+    total_expense_amount = finance_entries.filter(transaction_type=Expense.TYPE_EXPENSE).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    total_profit_amount = income_total - total_expense_amount
+
+    current_month = timezone.localdate().replace(day=1)
+    monthly_income_total = incomes.filter(issue_date__gte=current_month).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    monthly_expense_total = finance_entries.filter(
+        transaction_type=Expense.TYPE_EXPENSE,
+        issue_date__gte=current_month,
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    monthly_profit_total = monthly_income_total - monthly_expense_total
+
+    project_totals_qs = list(
+        incomes.values('project_id', 'project__name', 'project__color')
+        .annotate(total=Sum('amount'), count=Count('id'))
+        .order_by('-total', 'project__name')
+    )
+    highest_project_total = max((item['total'] or Decimal('0') for item in project_totals_qs), default=Decimal('0'))
+    project_income_rows = []
+    for item in project_totals_qs:
+        total = item['total'] or Decimal('0')
+        percent = round((total / highest_project_total) * 100) if highest_project_total else 0
+        project_income_rows.append({
+            'project_id': item['project_id'],
+            'project_name': item['project__name'],
+            'project_color': item['project__color'] or '#4f7cff',
+            'total': total,
+            'count': item['count'],
+            'percent': percent,
+        })
+
+    month_totals_qs = list(
+        incomes.annotate(month=TruncMonth('issue_date'))
+        .values('month')
+        .annotate(total=Sum('amount'), count=Count('id'))
+        .order_by('month')
+    )
+    highest_month_total = max((item['total'] or Decimal('0') for item in month_totals_qs), default=Decimal('0'))
+    monthly_income_rows = []
+    for item in month_totals_qs[-6:]:
+        total = item['total'] or Decimal('0')
+        percent = round((total / highest_month_total) * 100) if highest_month_total else 0
+        monthly_income_rows.append({
+            'label': item['month'].strftime('%b %Y') if item['month'] else 'No date',
+            'total': total,
+            'count': item['count'],
+            'percent': percent,
+        })
+
+    monthly_expense_totals_qs = list(
+        finance_entries.filter(transaction_type=Expense.TYPE_EXPENSE)
+        .annotate(month=TruncMonth('issue_date'))
+        .values('month')
+        .annotate(total=Sum('amount'))
+        .order_by('month')
+    )
+    expense_month_map = {item['month']: item['total'] or Decimal('0') for item in monthly_expense_totals_qs}
+    income_month_map = {item['month']: item['total'] or Decimal('0') for item in month_totals_qs}
+    combined_months = sorted({*income_month_map.keys(), *expense_month_map.keys()})
+    combined_months = [month for month in combined_months if month][-12:]
+    if len(combined_months) < 6:
+        fallback_months = []
+        cursor = current_month
+        for step in range(5, -1, -1):
+            month_anchor = cursor.replace(day=1)
+            year = month_anchor.year
+            month = month_anchor.month - step
+            while month <= 0:
+                month += 12
+                year -= 1
+            fallback_months.append(date(year, month, 1))
+        combined_months = fallback_months
+    pnl_max_total = max(
+        [income_month_map.get(month, Decimal('0')) + expense_month_map.get(month, Decimal('0')) for month in combined_months],
+        default=Decimal('0')
+    )
+    profit_max_total = max(
+        [abs(income_month_map.get(month, Decimal('0')) - expense_month_map.get(month, Decimal('0'))) for month in combined_months],
+        default=Decimal('0')
+    )
+    pnl_chart_rows = []
+    for month in combined_months:
+        income_value = income_month_map.get(month, Decimal('0'))
+        expense_value = expense_month_map.get(month, Decimal('0'))
+        profit_value = income_value - expense_value
+        pnl_chart_rows.append({
+            'label': month.strftime('%b'),
+            'full_label': month.strftime('%b %Y'),
+            'income': income_value,
+            'expense': expense_value,
+            'profit': profit_value,
+            'income_height': round((income_value / pnl_max_total) * 100) if pnl_max_total else 0,
+            'expense_height': round((expense_value / pnl_max_total) * 100) if pnl_max_total else 0,
+            'profit_point': round((profit_value / profit_max_total) * 100) if profit_max_total and profit_value > 0 else 0,
+            'show_profit_marker': bool(profit_value > 0 and profit_max_total),
+        })
+
+    previous_month_start = (current_month.replace(day=1) - timedelta(days=1)).replace(day=1)
+    previous_month_income_total = incomes.filter(issue_date__gte=previous_month_start, issue_date__lt=current_month).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    previous_month_expense_total = finance_entries.filter(
+        transaction_type=Expense.TYPE_EXPENSE,
+        issue_date__gte=previous_month_start,
+        issue_date__lt=current_month,
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    previous_month_profit_total = previous_month_income_total - previous_month_expense_total
+
+    def build_change(current_value, previous_value):
+        if previous_value:
+            delta = ((current_value - previous_value) / previous_value) * 100
+            return round(delta, 1)
+        return 100.0 if current_value else 0.0
+
+    leading_project = project_income_rows[0] if project_income_rows else None
+
+    context = build_dashboard_base_context(request, user)
+    context.update({
+        'income_rows': income_rows,
+        'income_total': income_total,
+        'income_paid_total': paid_income_total,
+        'income_pending_total': pending_income_total,
+        'income_month_total': monthly_income_total,
+        'income_net_total': income_net_total,
+        'income_total_expense_amount': total_expense_amount,
+        'income_total_profit_amount': total_profit_amount,
+        'income_month_expense_total': monthly_expense_total,
+        'income_month_profit_total': monthly_profit_total,
+        'income_project_rows': project_income_rows[:6],
+        'income_monthly_rows': monthly_income_rows,
+        'income_pnl_chart_rows': pnl_chart_rows,
+        'income_leading_project': leading_project,
+        'income_transaction_count': len(income_rows),
+        'income_status_choices': Expense.PAYMENT_STATUS_CHOICES,
+        'income_project_options': finance_projects,
+        'income_current_month_label': current_month.strftime('%b %Y'),
+        'income_revenue_change': build_change(monthly_income_total, previous_month_income_total),
+        'income_expense_change': build_change(monthly_expense_total, previous_month_expense_total),
+        'income_profit_change': build_change(monthly_profit_total, previous_month_profit_total),
+        'income_filters': {
+            'search': search_query,
+            'status': status_filter,
+            'project': project_filter,
+        },
+    })
+    return render(request, 'dashboard/income_visualization.html', context)
 
 
 @require_POST
@@ -2085,7 +2518,6 @@ def add_project_expense(request, project_id):
     Expense.objects.create(
         project=project,
         category=category,
-        created_by=user,
         title=description,
         description=description,
         amount=amount,
@@ -2130,7 +2562,7 @@ def create_expense_category(request, project_id):
     category, created = ExpenseCategory.objects.get_or_create(
         project=project,
         name=category_name,
-        defaults={'created_by': user, 'is_fixed': False},
+        defaults={'is_fixed': False},
     )
     if created:
         ActivityLog.objects.create(
@@ -2167,7 +2599,6 @@ def create_finance_transaction(request):
     status = request.POST.get('status', Expense.STATUS_PENDING).strip()
     issue_date = request.POST.get('issue_date', '').strip()
     paid_date = request.POST.get('paid_date', '').strip()
-    reference_id = request.POST.get('reference_id', '').strip()
     description = request.POST.get('description', '').strip()
 
     project = get_accessible_projects(user).filter(id=project_id).first()
@@ -2206,21 +2637,20 @@ def create_finance_transaction(request):
     else:
         transaction_type = Expense.TYPE_INCOME if entry_kind == 'income' else Expense.TYPE_EXPENSE
 
-    Expense.objects.create(
+    transaction = Expense.objects.create(
         project=project,
         category=None,
-        created_by=user,
         assigned_user=assigned_user,
         amount=amount,
         title=title,
         description=description or title,
         transaction_type=transaction_type,
-        reference_id=reference_id or None,
         status=status,
         issue_date=parse_date(issue_date) if issue_date else None,
         paid_date=parse_date(paid_date) if paid_date else None,
         note=description or None,
     )
+    ensure_transaction_reference_id(transaction)
     ActivityLog.objects.create(
         user=user,
         action=f'added a {"salary payment" if entry_kind == "salary" else entry_kind} transaction for "{project.name}"',
@@ -2262,7 +2692,6 @@ def update_finance_transaction(request, transaction_id):
     status = request.POST.get('status', transaction.status).strip()
     issue_date = request.POST.get('issue_date', '').strip()
     paid_date = request.POST.get('paid_date', '').strip()
-    reference_id = request.POST.get('reference_id', '').strip()
     description = request.POST.get('description', '').strip()
     assigned_user_id = request.POST.get('assigned_user', '').strip()
 
@@ -2297,10 +2726,10 @@ def update_finance_transaction(request, transaction_id):
     transaction.status = status if status in {choice[0] for choice in Expense.PAYMENT_STATUS_CHOICES} else Expense.STATUS_PENDING
     transaction.issue_date = parse_date(issue_date) if issue_date else None
     transaction.paid_date = parse_date(paid_date) if paid_date else None
-    transaction.reference_id = reference_id or None
     transaction.category = None
     transaction.assigned_user = assigned_user
     transaction.save()
+    ensure_transaction_reference_id(transaction)
 
     ActivityLog.objects.create(
         user=user,
@@ -2422,14 +2851,6 @@ def assign_employee_project(request):
         },
     )
     membership.assignment_status = assignment_status
-    try:
-        hours_per_day = Decimal(request.POST.get('allocation_hours_per_day', '').strip() or '0')
-        if hours_per_day < 0:
-            raise InvalidOperation
-    except (InvalidOperation, TypeError):
-        messages.error(request, 'Time allocated must be a valid number.')
-        return redirect(f"{reverse('employees')}?employee={employee.id}")
-    membership.allocation_hours_per_day = hours_per_day
     membership.assignment_start_date = parse_date(start_date) if start_date else project.start_date
     membership.assignment_end_date = parse_date(end_date) if end_date else project.end_date
     membership.assignment_notes = description or None

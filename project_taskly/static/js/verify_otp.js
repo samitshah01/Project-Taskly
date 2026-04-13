@@ -7,8 +7,9 @@
     const form = document.getElementById('otp-form');
     const resendBtn = document.getElementById('otp-resend-btn');
     const resendTimerEl = document.getElementById('otp-resend-timer');
+    const resendUrl = document.getElementById('otp-resend-url')?.value;
 
-    if (!digits.length || !hiddenOtp || !submitBtn || !form || !resendBtn) return;
+    if (!digits.length || !hiddenOtp || !submitBtn || !form || !resendBtn || !resendUrl) return;
 
     digits[0].focus();
 
@@ -119,7 +120,7 @@
         resendBtn.disabled = true;
         resendBtn.innerHTML = 'Sending…';
 
-        fetch("{% url 'resend_otp' %}", {
+        fetch(resendUrl, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

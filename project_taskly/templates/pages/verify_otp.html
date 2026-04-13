@@ -18,7 +18,13 @@
       </div>
       <div class="otp-header">
         <h1 class="otp-title">Enter verification code</h1>
-        <p class="otp-sub">We sent a 6-digit code to your email address.</p>
+        <p class="otp-sub">
+          {% if otp_purpose == 'login' %}
+            We sent a 6-digit login verification code to your email address.
+          {% else %}
+            We sent a 6-digit code to your email address.
+          {% endif %}
+        </p>
         <div class="otp-email-pill">
           <i class="bi bi-envelope" style="font-size:11px;"></i>
           {{ masked_email }}
@@ -28,6 +34,7 @@
       <form id="otp-form" method="POST" action="{% url 'verify_otp' %}" novalidate>
         {% csrf_token %}
         <input type="hidden" name="otp" id="otp-hidden" />
+        <input type="hidden" id="otp-resend-url" value="{{ otp_resend_url }}" />
 
         <div class="otp-inputs" id="otp-inputs">
           <input type="text" inputmode="numeric" maxlength="1" class="otp-digit" data-idx="0"
@@ -50,7 +57,7 @@
 
         <button type="submit" class="otp-submit" id="otp-submit-btn" disabled>
           <div class="otp-spinner"></div>
-          <span class="otp-btn-label">Verify Code</span>
+          <span class="otp-btn-label">{% if otp_purpose == 'login' %}Verify and Continue{% else %}Verify Code{% endif %}</span>
           <i class="bi bi-shield-check otp-btn-icon"></i>
         </button>
 
@@ -64,9 +71,9 @@
       </div>
 
       <div class="otp-divider"><span>or</span></div>
-      <a href="{% url 'login' %}" class="otp-back">
+      <a href="{% if otp_purpose == 'login' %}{% url 'login' %}{% else %}{% url 'forgot_password' %}{% endif %}" class="otp-back">
         <i class="bi bi-arrow-left" style="font-size:13px;"></i>
-        Back to Sign In
+        {% if otp_purpose == 'login' %}Back to Sign In{% else %}Back to Forgot Password{% endif %}
       </a>
 
     </div>

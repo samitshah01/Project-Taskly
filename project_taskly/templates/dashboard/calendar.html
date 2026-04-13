@@ -1,0 +1,153 @@
+{% extends 'components/dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Calendar - Taskly{% endblock %}
+
+{% block dashboard_content %}
+<section class="calendar-page">
+    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
+        <div>
+            <div class="board-breadcrumb">
+                <a href="{% url 'dashboard' %}">Dashboard</a>
+                <span>/</span>
+                <span>Calendar</span>
+            </div>
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <div class="project-icon-wrap" style="background:rgba(79,124,255,0.12);color:var(--accent);">
+                    <i class="bi bi-calendar3"></i>
+                </div>
+                <div>
+                    <h4 style="font-weight:800;font-size:1.25rem;margin-bottom:4px;">Calendar</h4>
+                    <p style="color:var(--muted);font-size:13px;margin:0;">A unified project schedule built from your task due dates and project milestones.</p>
+                </div>
+            </div>
+        </div>
+        <div class="calendar-toolbar-summary">
+            <div class="calendar-mini-stat">
+                <span>Projects</span>
+                <strong>{{ calendar_total_projects }}</strong>
+            </div>
+            <div class="calendar-mini-stat">
+                <span>Events</span>
+                <strong>{{ calendar_total_events }}</strong>
+            </div>
+        </div>
+    </div>
+
+    <div class="calendar-shell">
+        <section class="calendar-main-panel">
+            <div class="calendar-toolbar">
+                <div class="calendar-toolbar-left">
+                    <button type="button" class="cal-nav-btn" id="calendarPrevBtn" aria-label="Previous period">
+                        <i class="bi bi-chevron-left"></i>
+                    </button>
+                    <button type="button" class="cal-nav-btn" id="calendarNextBtn" aria-label="Next period">
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+                    <button type="button" class="btn-ghost" id="calendarTodayBtn">Today</button>
+                    <div class="calendar-title" id="calendarTitle"></div>
+                </div>
+                <div class="calendar-view-switch" role="tablist" aria-label="Calendar views">
+                    <button type="button" class="calendar-view-btn active" data-calendar-view="month">Month</button>
+                    <button type="button" class="calendar-view-btn" data-calendar-view="week">Week</button>
+                    <button type="button" class="calendar-view-btn" data-calendar-view="day">Day</button>
+                </div>
+            </div>
+
+            <div class="calendar-view" id="calendarMonthView">
+                <div class="calendar-grid-shell">
+                    <div class="calendar-dow-row">
+                        <div class="calendar-dow-cell">Sun</div>
+                        <div class="calendar-dow-cell">Mon</div>
+                        <div class="calendar-dow-cell">Tue</div>
+                        <div class="calendar-dow-cell">Wed</div>
+                        <div class="calendar-dow-cell">Thu</div>
+                        <div class="calendar-dow-cell">Fri</div>
+                        <div class="calendar-dow-cell">Sat</div>
+                    </div>
+                    <div class="calendar-days-grid" id="calendarMonthGrid"></div>
+                </div>
+            </div>
+
+            <div class="calendar-view d-none" id="calendarWeekView">
+                <div class="calendar-week-shell">
+                    <div class="calendar-week-header" id="calendarWeekHeader"></div>
+                    <div class="calendar-week-body">
+                        <div class="calendar-week-hours" id="calendarWeekHours"></div>
+                        <div class="calendar-week-columns" id="calendarWeekColumns"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="calendar-view d-none" id="calendarDayView">
+                <div class="calendar-day-shell">
+                    <div class="calendar-day-header">
+                        <h5 id="calendarDayTitle">Day Schedule</h5>
+                        <p id="calendarDaySubtitle">Your selected day timeline.</p>
+                    </div>
+                    <div class="calendar-day-timeline" id="calendarDayTimeline"></div>
+                </div>
+            </div>
+        </section>
+
+        <aside class="calendar-side-panel">
+            <div class="calendar-side-card">
+                <div class="calendar-side-title"><i class="bi bi-calendar2-week"></i> Mini Calendar</div>
+                <div class="calendar-mini-month-row">
+                    <button type="button" class="cal-nav-btn" id="calendarMiniPrevBtn" aria-label="Previous month">
+                        <i class="bi bi-chevron-left"></i>
+                    </button>
+                    <div class="calendar-mini-month-label" id="calendarMiniMonthLabel"></div>
+                    <button type="button" class="cal-nav-btn" id="calendarMiniNextBtn" aria-label="Next month">
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+                </div>
+                <div class="calendar-mini-dow">
+                    <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+                </div>
+                <div class="calendar-mini-grid" id="calendarMiniGrid"></div>
+            </div>
+
+            <div class="calendar-side-card">
+                <div class="calendar-side-title"><i class="bi bi-alarm"></i> Upcoming</div>
+                <div class="calendar-upcoming-list">
+                    {% for event in calendar_upcoming_events %}
+                    <a href="{{ event.url }}" class="calendar-upcoming-item">
+                        <span class="calendar-upcoming-color" style="background:{{ event.color }};"></span>
+                        <div class="calendar-upcoming-copy">
+                            <strong>{{ event.title }}</strong>
+                            <span>{{ event.date }} · {{ event.time }}</span>
+                            <small>{{ event.project }}</small>
+                        </div>
+                    </a>
+                    {% empty %}
+                    <p class="workspace-empty-inline">No upcoming events yet.</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="calendar-side-card">
+                <div class="calendar-side-title"><i class="bi bi-folder2-open"></i> Project Legend</div>
+                <div class="calendar-legend-list">
+                    {% for item in calendar_project_legend %}
+                    <div class="calendar-legend-item">
+                        <span class="calendar-legend-dot" style="background:{{ item.project.color|default:'#4f7cff' }};"></span>
+                        <span class="calendar-legend-name">{{ item.project.name }}</span>
+                        <strong class="calendar-legend-count">{{ item.count }}</strong>
+                    </div>
+                    {% empty %}
+                    <p class="workspace-empty-inline">No project events available.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    {{ calendar_events|json_script:"calendar-events-data" }}
+    <script id="calendar-today-data" type="application/json">"{{ calendar_today }}"</script>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/calendar.js' %}"></script>
+{% endblock %}

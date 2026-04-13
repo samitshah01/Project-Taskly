@@ -19,6 +19,7 @@ class Users(models.Model):
     email = models.CharField(unique=True, max_length=150)
     password = models.CharField(max_length=255)
     role = models.CharField(max_length=50, default='user')
+    is_email_verified = models.BooleanField(default=False)
     created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
@@ -140,7 +141,6 @@ class ProjectMember(models.Model):
     role = models.CharField(max_length=100, blank=True, null=True)
     is_manager = models.BooleanField(default=False)
     assignment_status = models.CharField(max_length=20, default='active')
-    allocation_hours_per_day = models.DecimalField(max_digits=4, decimal_places=1, default=0)
     assignment_start_date = models.DateField(blank=True, null=True)
     assignment_end_date = models.DateField(blank=True, null=True)
     assignment_notes = models.TextField(blank=True, null=True)
@@ -234,13 +234,6 @@ class ExpenseCategory(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='expense_categories')
     name = models.CharField(max_length=120)
     is_fixed = models.BooleanField(default=False)
-    created_by = models.ForeignKey(
-        Users,
-        on_delete=models.SET_NULL,
-        related_name='created_expense_categories',
-        blank=True,
-        null=True,
-    )
     created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
@@ -276,13 +269,6 @@ class Expense(models.Model):
         ExpenseCategory,
         on_delete=models.SET_NULL,
         related_name='expenses',
-        blank=True,
-        null=True,
-    )
-    created_by = models.ForeignKey(
-        Users,
-        on_delete=models.SET_NULL,
-        related_name='created_expenses',
         blank=True,
         null=True,
     )

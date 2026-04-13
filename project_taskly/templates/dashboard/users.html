@@ -1,0 +1,183 @@
+{% extends 'components/dashboard_base.html' %}
+
+{% block title %}Users - Taskly{% endblock %}
+
+{% block dashboard_content %}
+<section class="workspace-shell employee-page-shell">
+    <div class="workspace-shell-header">
+        <div>
+            <div class="board-breadcrumb">
+                <a href="{% url 'dashboard' %}">Dashboard</a>
+                <span>/</span>
+                <span>Users</span>
+            </div>
+            <div class="workspace-heading-row">
+                <div class="workspace-heading-copy">
+                    <span class="workspace-kicker">User Directory</span>
+                    <h1 class="workspace-title">Users</h1>
+                    <p class="workspace-copy">Browse all users in the system and view their profile details only.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="employee-layout">
+        <section class="workspace-panel employee-list-panel">
+            <div class="workspace-panel-head">
+                <div>
+                    <div class="workspace-panel-title-row">
+                        <h2 class="workspace-panel-title">All Users</h2>
+                        <span class="workspace-panel-count">{{ user_page_obj.paginator.count }}</span>
+                    </div>
+                    <p class="workspace-panel-copy">Every registered user is listed here, including their basic account information.</p>
+                </div>
+            </div>
+
+            <form method="get" class="workspace-toolbar">
+                <div class="workspace-toolbar-actions employee-search-bar">
+                    <div class="workspace-search">
+                        <i class="bi bi-search"></i>
+                        <input type="search" name="search" class="form-control" placeholder="Search users" value="{{ user_search }}">
+                    </div>
+                    {% if selected_user %}
+                    <input type="hidden" name="user" value="{{ selected_user.user.id }}">
+                    {% endif %}
+                    <button type="submit" class="btn-ghost"><i class="bi bi-funnel"></i> Search</button>
+                </div>
+            </form>
+
+            <div class="employee-list">
+                {% for item in user_page_obj.object_list %}
+                <a href="{% url 'users' %}?user={{ item.user.id }}{% if user_search %}&search={{ user_search|urlencode }}{% endif %}"
+                    class="employee-row-card {% if selected_user and selected_user.user.id == item.user.id %}active{% endif %}">
+                    <div class="workspace-person">
+                        <div class="proj-ava workspace-person-avatar" data-avatar-user-id="{{ item.user.id }}" data-avatar-initials="{{ item.user.initials }}">
+                            {% if item.user.avatar_url %}
+                            <img src="{{ item.user.avatar_url }}" alt="{{ item.user.display_name }}" class="avatar-media avatar-media-cover">
+                            {% else %}
+                            {{ item.user.initials }}
+                            {% endif %}
+                        </div>
+                        <div>
+                            <span class="workspace-person-name">{{ item.user.display_name }}</span>
+                            <span class="workspace-project-sub">{{ item.user.email }}</span>
+                        </div>
+                    </div>
+                    <div class="employee-row-meta">
+                        <span>{{ item.user.role|title }}</span>
+                        <span>@{{ item.user.username|default:"-" }}</span>
+                    </div>
+                    <div class="employee-row-meta">
+                        <span>{{ item.membership_count }} project{{ item.membership_count|pluralize }}</span>
+                        <strong>{{ item.user.created_at|date:"M d, Y" }}</strong>
+                    </div>
+                </a>
+                {% empty %}
+                <p class="workspace-empty-inline">No users matched your search.</p>
+                {% endfor %}
+            </div>
+
+            {% if user_page_obj.paginator.num_pages > 1 %}
+            <nav class="employee-pagination-nav">
+                <ul class="pagination pagination-dark-custom mb-0">
+                    {% if user_page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ user_page_obj.previous_page_number }}{% if user_search %}&search={{ user_search|urlencode }}{% endif %}{% if selected_user %}&user={{ selected_user.user.id }}{% endif %}">Previous</a>
+                    </li>
+                    {% endif %}
+                    {% for page_number in user_page_obj.paginator.page_range %}
+                    <li class="page-item {% if user_page_obj.number == page_number %}active{% endif %}">
+                        <a class="page-link" href="?page={{ page_number }}{% if user_search %}&search={{ user_search|urlencode }}{% endif %}{% if selected_user %}&user={{ selected_user.user.id }}{% endif %}">{{ page_number }}</a>
+                    </li>
+                    {% endfor %}
+                    {% if user_page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ user_page_obj.next_page_number }}{% if user_search %}&search={{ user_search|urlencode }}{% endif %}{% if selected_user %}&user={{ selected_user.user.id }}{% endif %}">Next</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </section>
+
+        <section class="workspace-panel employee-detail-panel">
+            {% if selected_user %}
+            <div class="employee-profile-hero">
+                <div class="employee-profile-top">
+                    <div class="employee-profile-main">
+                        <div class="employee-profile-avatar" data-avatar-user-id="{{ selected_user.user.id }}" data-avatar-initials="{{ selected_user.user.initials }}">
+                            {% if selected_user.user.avatar_url %}
+                            <img src="{{ selected_user.user.avatar_url }}" alt="{{ selected_user.user.display_name }}" class="avatar-media avatar-media-cover">
+                            {% else %}
+                            {{ selected_user.user.initials }}
+                            {% endif %}
+                        </div>
+                        <div>
+                            <h2 class="employee-profile-name">{{ selected_user.user.display_name }}</h2>
+                            <div class="employee-profile-meta">{{ selected_user.user.role|title }}{% if selected_user.profile %} • {{ selected_user.profile.get_employee_type_display }}{% endif %}</div>
+                        </div>
+                    </div>
+                    <div class="employee-profile-stats">
+                        <div class="board-budget-stat">
+                            <span>Joined</span>
+                            <strong>{{ selected_user.user.created_at|date:"M d, Y" }}</strong>
+                        </div>
+                        <div class="board-budget-stat">
+                            <span>Projects</span>
+                            <strong>{{ selected_user.membership_count }}</strong>
+                        </div>
+                        <div class="board-budget-stat">
+                            <span>Status</span>
+                            <strong>{% if selected_user.profile %}{{ selected_user.profile.get_status_display }}{% else %}Registered{% endif %}</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="employee-detail-grid">
+                <div class="employee-detail-card">
+                    <span>Full name</span>
+                    <strong>{{ selected_user.user.display_name }}</strong>
+                </div>
+                <div class="employee-detail-card">
+                    <span>Username</span>
+                    <strong>{{ selected_user.user.username|default:"-" }}</strong>
+                </div>
+                <div class="employee-detail-card">
+                    <span>Email</span>
+                    <strong>{{ selected_user.user.email }}</strong>
+                </div>
+                <div class="employee-detail-card">
+                    <span>Role</span>
+                    <strong>{{ selected_user.user.role|title }}</strong>
+                </div>
+                <div class="employee-detail-card">
+                    <span>Created at</span>
+                    <strong>{{ selected_user.user.created_at|date:"M d, Y" }}</strong>
+                </div>
+                <div class="employee-detail-card">
+                    <span>Project memberships</span>
+                    <strong>{{ selected_user.membership_count }}</strong>
+                </div>
+                {% if selected_user.profile %}
+                <div class="employee-detail-card">
+                    <span>Employee type</span>
+                    <strong>{{ selected_user.profile.get_employee_type_display }}</strong>
+                </div>
+                <div class="employee-detail-card">
+                    <span>Employment status</span>
+                    <strong>{{ selected_user.profile.get_status_display }}</strong>
+                </div>
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="empty-state" style="display:block;">
+                <div class="empty-icon"><i class="bi bi-person-lines-fill"></i></div>
+                <div class="empty-title">No user selected</div>
+                <p class="empty-sub">Choose a user from the list to inspect their details.</p>
+            </div>
+            {% endif %}
+        </section>
+    </div>
+</section>
+{% endblock %}

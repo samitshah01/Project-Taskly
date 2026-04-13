@@ -16,8 +16,11 @@ urlpatterns = [
     path('register/', views.register, name='register'),
     
     path('dashboard/', views.dashboard, name='dashboard'),
+    path('dashboard/calendar', views.calendar, name='calendar'),
+    path('dashboard/income', views.income_visualization, name='income_visualization'),
     path('dashboard/budgets', views.budget_tracking, name='budget_tracking'),
     path('dashboard/projects/<int:project_id>/budget/', views.project_budget, name='project_budget'),
+    path('dashboard/users', views.users, name='users'),
     path('dashboard/finance/create/', views.create_finance_transaction, name='create_finance_transaction'),
     path('dashboard/finance/<int:transaction_id>/update/', views.update_finance_transaction, name='update_finance_transaction'),
     path('dashboard/employees', views.employees, name='employees'),

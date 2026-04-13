@@ -13,9 +13,9 @@
             </div>
             <div class="workspace-heading-row">
                 <div class="workspace-heading-copy">
-                    <span class="workspace-kicker">Team Directory</span>
-                    <h1 class="workspace-title">Employee Management</h1>
-                    <p class="workspace-copy">Review your team, inspect employee details, and manage assignments without leaving the Taskly dashboard shell.</p>
+                    <span class="workspace-kicker">Assigned Directory</span>
+                    <h1 class="workspace-title">Employees</h1>
+                    <p class="workspace-copy">Review assigned team members and see which projects each employee has been added to.</p>
                 </div>
             </div>
         </div>
@@ -26,10 +26,10 @@
             <div class="workspace-panel-head">
                 <div>
                     <div class="workspace-panel-title-row">
-                        <h2 class="workspace-panel-title">Employee List</h2>
+                        <h2 class="workspace-panel-title">Assigned Members</h2>
                         <span class="workspace-panel-count">{{ employee_page_obj.paginator.count }}</span>
                     </div>
-                    <p class="workspace-panel-copy">A compact staff directory built with the same Taskly cards, typography, and spacing language.</p>
+                    <p class="workspace-panel-copy">This list only shows users who are currently assigned to at least one project.</p>
                 </div>
             </div>
 
@@ -37,7 +37,7 @@
                 <div class="workspace-toolbar-actions employee-search-bar">
                     <div class="workspace-search">
                         <i class="bi bi-search"></i>
-                        <input type="search" name="search" class="form-control" placeholder="Search employees" value="{{ employee_search }}">
+                        <input type="search" name="search" class="form-control" placeholder="Search employees or projects" value="{{ employee_search }}">
                     </div>
                     {% if selected_employee %}
                     <input type="hidden" name="employee" value="{{ selected_employee.user.id }}">
@@ -65,15 +65,15 @@
                     </div>
                     <div class="employee-row-meta">
                         <span>{{ item.user.role|title }}</span>
-                        <span>{{ item.profile.get_employee_type_display }}</span>
+                        <span>{{ item.membership_count }} project{{ item.membership_count|pluralize }}</span>
                     </div>
                     <div class="employee-row-meta">
                         <span class="badge {{ item.status_badge_class }}">{{ item.profile.get_status_display }}</span>
-                        <strong>${{ item.salary_display }}</strong>
+                        <strong>{{ item.primary_assignment.project.name|default:"-" }}</strong>
                     </div>
                 </a>
                 {% empty %}
-                <p class="workspace-empty-inline">No employees matched your search.</p>
+                <p class="workspace-empty-inline">No assigned employees matched your search.</p>
                 {% endfor %}
             </div>
 
@@ -139,8 +139,6 @@
                     <a href="{% url 'employees' %}?employee={{ selected_employee.user.id }}&detail_tab=projects{% if employee_search %}&search={{ employee_search|urlencode }}{% endif %}" class="finance-subnav-link {% if employee_detail_tab == 'projects' %}active{% endif %}">Projects</a>
                     <a href="{% url 'employees' %}?employee={{ selected_employee.user.id }}&detail_tab=details{% if employee_search %}&search={{ employee_search|urlencode }}{% endif %}" class="finance-subnav-link {% if employee_detail_tab == 'details' %}active{% endif %}">Employee Details</a>
                 </div>
-                {% if employee_detail_tab == 'projects' %}
-                {% endif %}
             </div>
 
             {% if employee_detail_tab == 'projects' %}
@@ -217,13 +215,17 @@
                     <span>Status</span>
                     <strong>{{ selected_employee.profile.get_status_display }}</strong>
                 </div>
+                <div class="employee-detail-card">
+                    <span>Assigned projects</span>
+                    <strong>{{ employee_assignment_rows|length }}</strong>
+                </div>
             </div>
             {% endif %}
             {% else %}
             <div class="empty-state" style="display:block;">
                 <div class="empty-icon"><i class="bi bi-people"></i></div>
                 <div class="empty-title">No employee selected</div>
-                <p class="empty-sub">Choose an employee from the list to inspect projects and profile details.</p>
+                <p class="empty-sub">Choose an assigned employee from the list to inspect project memberships and profile details.</p>
             </div>
             {% endif %}
         </section>

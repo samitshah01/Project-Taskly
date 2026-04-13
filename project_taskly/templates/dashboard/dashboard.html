@@ -104,245 +104,247 @@
 {% endif %}
 
 <div class="row g-3">
-  <div class="col-12 col-xl-8">
-    <div class="row g-3">
-      <div class="col-12 fade-in">
-        <div class="panel-card">
-          <div class="section-hdr">
-            <div class="panel-card-title" style="margin-bottom:0;"><i class="bi bi-check2-circle"
-                style="color:var(--accent);"></i> My Tasks</div>
-          </div>
-
-          <div style="margin-top:14px;">
-            {% for task in my_tasks %}
-            <div class="task-row">
-              <div class="task-row-check {% if task.status == 'completed' %}done{% endif %}"></div>
-              <div style="flex:1;min-width:0;">
-                <div class="task-row-title {% if task.status == 'completed' %}done{% endif %}">{{ task.title }}</div>
-                <div style="font-size:11px;color:var(--muted);margin-top:2px;">
-                  <i class="bi bi-folder2" style="font-size:10px;margin-right:3px;"></i>{{ task.project.name }}
-                </div>
-              </div>
-              <span class="priority-pill {{ task.priority }}">{{ task.priority|title }}</span>
-
-              {% if task.status == 'completed' %}
-              <span style="font-size:11px;color:var(--low);display:flex;align-items:center;gap:3px;"><i
-                  class="bi bi-check-circle-fill" style="font-size:11px;"></i> Done</span>
-              {% elif task.due_date %}
-              <span class="task-due {% if task.due_date < today_date %}overdue{% endif %}">
-                <i class="bi bi-calendar3" style="font-size:10px;margin-right:3px;"></i>{{ task.due_date|date:"M j" }}
-              </span>
-              {% else %}
-              <span class="task-due"><i class="bi bi-calendar3" style="font-size:10px;margin-right:3px;"></i>No
-                deadline</span>
-              {% endif %}
-            </div>
-            {% empty %}
-            <p style="margin:0;color:var(--muted);font-size:13px;">No tasks assigned yet.</p>
-            {% endfor %}
-          </div>
-        </div>
+  <div class="col-12 col-md-6 col-xxl-3 fade-in">
+    <div class="panel-card h-100">
+      <div class="panel-card-title"><i class="bi bi-pie-chart" style="color:var(--accent);"></i> Task Breakdown
       </div>
-
-      <div class="col-12 fade-in">
-        <div class="panel-card">
-          <div class="section-hdr">
-            <div class="panel-card-title" style="margin-bottom:0;"><i class="bi bi-folder2"
-                style="color:var(--accent2);"></i> Project Progress</div>
+      <div class="donut-wrap task-breakdown-card">
+        <div class="task-donut-chart" id="taskBreakdownChart" data-chart-values="{{ dashboard_chart_data|join:',' }}"></div>
+        <div class="donut-legend task-breakdown-legend">
+          <div class="legend-item">
+            <span class="legend-dot" style="background:var(--low);"></span>
+            <span class="legend-label">Completed</span>
+            <span class="legend-val" style="color:var(--low);">{{ completed_tasks }}</span>
           </div>
-
-          <div style="margin-top:14px;">
-            {% for row in project_rows %}
-            <div class="project-row">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                  <div class="project-name">{{ row.object.name }}</div>
-                  {% if row.current_membership %}
-                  <span class="badge {% if row.current_membership.is_manager %}bg-primary{% else %}bg-secondary{% endif %}">
-                    {{ row.current_membership.display_role }}
-                  </span>
-                  {% endif %}
-                </div>
-                <span style="font-size:11px;color:var(--muted);">{{ row.task_total }} tasks</span>
-              </div>
-              <div class="project-meta">
-                <span><i class="bi bi-people" style="margin-right:3px;"></i>{{ row.members|length }} members</span>
-                <span><i class="bi bi-calendar3" style="margin-right:3px;"></i>{% if row.object.end_date %}Due {{ row.object.end_date|date:"M j" }}{% else %}No deadline{% endif %}</span>
-                <span class="project-progress-value {{ row.object.status }}">{{ row.progress }}%</span>
-              </div>
-              <div class="member-stack member-stack-inline" style="margin-top:10px;">
-                {% for member in row.members %}
-                <div class="member-avatar-shell">
-                  <div class="proj-ava" style="background:var(--accent);" data-avatar-user-id="{{ member.user.id }}" data-avatar-initials="{{ member.user.initials }}">{% if member.user.avatar_url %}<img src="{{ member.user.avatar_url }}" alt="{{ member.user.display_name }}" class="avatar-media avatar-media-cover">{% else %}{{ member.user.initials }}{% endif %}</div>
-                  <div class="member-hover-card">
-                    <div class="member-hover-name">{{ member.user.display_name }}</div>
-                    <div class="member-hover-role">{{ member.role }}</div>
-                  </div>
-                </div>
-                {% endfor %}
-              </div>
-              <div class="progress-track">
-                <div class="progress-fill dashboard-progress-fill" data-progress-width="{{ row.progress }}">
-                </div>
-              </div>
-            </div>
-            {% empty %}
-            <p style="margin:0;color:var(--muted);font-size:13px;">No projects available yet.</p>
-            {% endfor %}
+          <div class="legend-item">
+            <span class="legend-dot" style="background:var(--accent);"></span>
+            <span class="legend-label">In Progress</span>
+            <span class="legend-val" style="color:var(--accent);">{{ in_progress_tasks }}</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot" style="background:var(--med);"></span>
+            <span class="legend-label">Pending</span>
+            <span class="legend-val" style="color:var(--med);">{{ pending_tasks }}</span>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="col-12 col-xl-4">
-    <div class="row g-3">
-      <div class="col-12 fade-in">
-        <div class="panel-card">
-          <div class="panel-card-title"><i class="bi bi-pie-chart" style="color:var(--accent);"></i> Task Breakdown
-          </div>
-          <div class="donut-wrap" style="display:block;">
-            <div class="dashboard-bar-chart" id="commitChart" data-chart-values="{{ dashboard_chart_data|join:',' }}"></div>
-            <div style="display:grid;gap:10px;">
-              <div class="legend-item"><span class="legend-dot" style="background:var(--low);"></span><span style="color:var(--muted);">Completed</span><span class="legend-val" style="color:var(--low);">{{ completed_tasks }}</span></div>
-              <div class="legend-item"><span class="legend-dot" style="background:var(--accent);"></span><span style="color:var(--muted);">In Progress</span><span class="legend-val" style="color:var(--accent);">{{ in_progress_tasks }}</span></div>
-              <div class="legend-item"><span class="legend-dot" style="background:var(--med);"></span><span style="color:var(--muted);">Pending</span><span class="legend-val" style="color:var(--med);">{{ pending_tasks }}</span></div>
-              <div class="legend-item"><span class="legend-dot" style="background:var(--high);"></span><span style="color:var(--muted);">Overdue</span><span class="legend-val" style="color:var(--high);">{{ overdue_tasks }}</span></div>
-            </div>
-          </div>
+  <div class="col-12 col-md-6 col-xxl-3 fade-in">
+    <div class="panel-card h-100">
+      <div class="panel-card-title"><i class="bi bi-alarm" style="color:var(--high);"></i> Upcoming Deadlines</div>
+
+      {% for task in upcoming_deadlines %}
+      <div class="deadline-item">
+        <span class="deadline-dot {{ task.priority }}"></span>
+        <div>
+          <div class="deadline-title">{{ task.title }}</div>
+          <div class="deadline-date">{{ task.due_date|date:"M d, Y" }}</div>
+        </div>
+        <span class="deadline-badge">{{ task.project.name }}</span>
+      </div>
+      {% empty %}
+      <p style="margin:0;color:var(--muted);font-size:13px;">No upcoming deadlines.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="col-12 col-md-6 col-xxl-3 fade-in">
+    <div class="panel-card h-100">
+      <div class="panel-card-title"><i class="bi bi-wallet2" style="color:var(--accent2);"></i> Budget Overview</div>
+      <div class="board-budget-grid" style="margin-top:14px;">
+        <div class="board-budget-stat">
+          <span>Total Budget</span>
+          <strong>${{ dashboard_budget_total }}</strong>
+        </div>
+        <div class="board-budget-stat">
+          <span>Actual Spend</span>
+          <strong>${{ dashboard_budget_actual }}</strong>
+        </div>
+        <div class="board-budget-stat">
+          <span>Remaining</span>
+          <strong>${{ dashboard_budget_remaining }}</strong>
         </div>
       </div>
+      <div class="progress-track" style="margin-top:14px;">
+        <div class="progress-fill dashboard-progress-fill" data-progress-width="{{ dashboard_budget_usage_percent }}"></div>
+      </div>
+      <div class="project-progress-label" style="margin-top:8px;">
+        <span>Overall budget usage</span>
+        <strong>{{ dashboard_budget_usage_percent }}%</strong>
+      </div>
+      <div class="board-mini-list" style="margin-top:14px;">
+        {% for item in dashboard_budget_rows %}
+        <a href="{% url 'project_budget' item.project.id %}" class="board-mini-item board-mini-link">
+          <div>
+            <div class="board-mini-title">{{ item.project.name }}</div>
+            <div class="board-mini-copy">${{ item.actual }} spent of ${{ item.project.budget }}</div>
+          </div>
+          <strong>{{ item.usage_percent }}%</strong>
+        </a>
+        {% empty %}
+        <p style="margin:0;color:var(--muted);font-size:13px;">No project budgets available yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
 
-      <div class="col-12 fade-in">
-        <div class="panel-card">
-          <div class="panel-card-title"><i class="bi bi-wallet2" style="color:var(--accent2);"></i> Budget Overview</div>
-          <div class="board-budget-grid" style="margin-top:14px;">
-            <div class="board-budget-stat">
-              <span>Total Budget</span>
-              <strong>${{ dashboard_budget_total }}</strong>
-            </div>
-            <div class="board-budget-stat">
-              <span>Actual Spend</span>
-              <strong>${{ dashboard_budget_actual }}</strong>
-            </div>
-            <div class="board-budget-stat">
-              <span>Remaining</span>
-              <strong>${{ dashboard_budget_remaining }}</strong>
+  <div class="col-12 col-md-6 col-xxl-3 fade-in">
+    <div class="panel-card h-100">
+      <div class="panel-card-title"><i class="bi bi-activity" style="color:var(--accent);"></i> Recent Activity
+      </div>
+
+      {% for log in recent_activity %}
+      <div class="activity-item">
+        <div class="act-ava" style="background:var(--accent2);" data-avatar-user-id="{{ log.user.id }}" data-avatar-initials="{{ log.user.initials }}">{% if log.user.avatar_url %}<img src="{{ log.user.avatar_url }}" alt="{{ log.user.display_name }}" class="avatar-media avatar-media-cover">{% else %}{{ log.user.initials }}{% endif %}</div>
+        <div>
+          <div class="act-text"><strong>{{ log.user.display_name }}</strong> {{ log.action }}</div>
+          <div class="act-time">{{ log.timestamp|timesince }} ago</div>
+        </div>
+      </div>
+      {% empty %}
+      <p style="margin:0;color:var(--muted);font-size:13px;">No recent activity yet.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="col-12 col-xl-6 fade-in">
+    <div class="panel-card">
+      <div class="section-hdr">
+        <div class="panel-card-title" style="margin-bottom:0;"><i class="bi bi-check2-circle"
+            style="color:var(--accent);"></i> My Tasks</div>
+      </div>
+
+      <div style="margin-top:14px;">
+        {% for task in my_tasks %}
+        <div class="task-row dashboard-click-card" data-href="{% url 'project_board' task.project_id %}" tabindex="0" role="link" aria-label="Open task {{ task.title }} in project {{ task.project.name }}">
+          <div class="task-row-check {% if task.status == 'completed' %}done{% endif %}"></div>
+          <div style="flex:1;min-width:0;">
+            <div class="task-row-title {% if task.status == 'completed' %}done{% endif %}">{{ task.title }}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">
+              <i class="bi bi-folder2" style="font-size:10px;margin-right:3px;"></i>{{ task.project.name }}
             </div>
           </div>
-          <div class="progress-track" style="margin-top:14px;">
-            <div class="progress-fill dashboard-progress-fill" data-progress-width="{{ dashboard_budget_usage_percent }}"></div>
+          <span class="priority-pill {{ task.priority }}">{{ task.priority|title }}</span>
+
+          {% if task.status == 'completed' %}
+          <span style="font-size:11px;color:var(--low);display:flex;align-items:center;gap:3px;"><i
+              class="bi bi-check-circle-fill" style="font-size:11px;"></i> Done</span>
+          {% elif task.due_date %}
+          <span class="task-due {% if task.due_date < today_date %}overdue{% endif %}">
+            <i class="bi bi-calendar3" style="font-size:10px;margin-right:3px;"></i>{{ task.due_date|date:"M j" }}
+          </span>
+          {% else %}
+          <span class="task-due"><i class="bi bi-calendar3" style="font-size:10px;margin-right:3px;"></i>No
+            deadline</span>
+          {% endif %}
+        </div>
+        {% empty %}
+        <p style="margin:0;color:var(--muted);font-size:13px;">No tasks assigned yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-xl-6 fade-in">
+    <div class="panel-card">
+      <div class="section-hdr">
+        <div class="panel-card-title" style="margin-bottom:0;"><i class="bi bi-folder2"
+            style="color:var(--accent2);"></i> Project Progress</div>
+      </div>
+
+      <div style="margin-top:14px;">
+        {% for row in project_rows %}
+        <div class="project-row dashboard-click-card" data-href="{% url 'project_board' row.object.id %}" tabindex="0" role="link" aria-label="Open project {{ row.object.name }}">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <div class="project-name">{{ row.object.name }}</div>
+              {% if row.current_membership %}
+              <span class="team-role-badge {% if row.current_membership.is_manager %}bg-primary{% else %}bg-secondary{% endif %}">
+                {{ row.current_membership.display_role }}
+              </span>
+              {% endif %}
+            </div>
+            <span style="font-size:11px;color:var(--muted);">{{ row.task_total }} tasks</span>
           </div>
-          <div class="project-progress-label" style="margin-top:8px;">
-            <span>Overall budget usage</span>
-            <strong>{{ dashboard_budget_usage_percent }}%</strong>
+          <div class="project-meta">
+            <span><i class="bi bi-people" style="margin-right:3px;"></i>{{ row.members|length }} members</span>
+            <span><i class="bi bi-calendar3" style="margin-right:3px;"></i>{% if row.object.end_date %}Due {{ row.object.end_date|date:"M j" }}{% else %}No deadline{% endif %}</span>
+            <span class="project-progress-value {{ row.object.status }}">{{ row.progress }}%</span>
           </div>
-          <div class="board-mini-list" style="margin-top:14px;">
-            {% for item in dashboard_budget_rows %}
-            <a href="{% url 'project_budget' item.project.id %}" class="board-mini-item board-mini-link">
-              <div>
-                <div class="board-mini-title">{{ item.project.name }}</div>
-                <div class="board-mini-copy">${{ item.actual }} spent of ${{ item.project.budget }}</div>
+          <div class="member-stack member-stack-inline" style="margin-top:10px;">
+            {% for member in row.members %}
+            <div class="member-avatar-shell">
+              <div class="proj-ava project-member-avatar {{ member.badge_class }}" data-avatar-user-id="{{ member.user.id }}" data-avatar-initials="{{ member.user.initials }}">{% if member.user.avatar_url %}<img src="{{ member.user.avatar_url }}" alt="{{ member.user.display_name }}" class="avatar-media avatar-media-cover">{% else %}{{ member.user.initials }}{% endif %}</div>
+              <div class="member-hover-card">
+                <div class="member-hover-name">{{ member.user.display_name }}</div>
+                <div class="member-hover-role">{{ member.role }}</div>
               </div>
-              <strong>{{ item.usage_percent }}%</strong>
-            </a>
-            {% empty %}
-            <p style="margin:0;color:var(--muted);font-size:13px;">No project budgets available yet.</p>
+            </div>
             {% endfor %}
           </div>
-        </div>
-      </div>
-
-      <div class="col-12 fade-in">
-        <div class="panel-card">
-          <div class="panel-card-title"><i class="bi bi-alarm" style="color:var(--high);"></i> Upcoming Deadlines</div>
-
-          {% for task in upcoming_deadlines %}
-          <div class="deadline-item">
-            <span class="deadline-dot {{ task.priority }}"></span>
-            <div>
-              <div class="deadline-title">{{ task.title }}</div>
-              <div class="deadline-date">{{ task.due_date|date:"M d, Y" }}</div>
-            </div>
-            <span class="deadline-badge">{{ task.project.name }}</span>
-          </div>
-          {% empty %}
-          <p style="margin:0;color:var(--muted);font-size:13px;">No upcoming deadlines.</p>
-          {% endfor %}
-        </div>
-      </div>
-
-      <div class="col-12 fade-in">
-        <div class="panel-card">
-          <div class="panel-card-title"><i class="bi bi-activity" style="color:var(--accent);"></i> Recent Activity
-          </div>
-
-          {% for log in recent_activity %}
-          <div class="activity-item">
-            <div class="act-ava" style="background:var(--accent2);" data-avatar-user-id="{{ log.user.id }}" data-avatar-initials="{{ log.user.initials }}">{% if log.user.avatar_url %}<img src="{{ log.user.avatar_url }}" alt="{{ log.user.display_name }}" class="avatar-media avatar-media-cover">{% else %}{{ log.user.initials }}{% endif %}</div>
-            <div>
-              <div class="act-text"><strong>{{ log.user.display_name }}</strong> {{ log.action }}</div>
-              <div class="act-time">{{ log.timestamp|timesince }} ago</div>
+          <div class="progress-track">
+            <div class="progress-fill dashboard-progress-fill" data-progress-width="{{ row.progress }}">
             </div>
           </div>
-          {% empty %}
-          <p style="margin:0;color:var(--muted);font-size:13px;">No recent activity yet.</p>
-          {% endfor %}
         </div>
+        {% empty %}
+        <p style="margin:0;color:var(--muted);font-size:13px;">No projects available yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  {% if timeline_projects %}
+  <div class="col-12 col-xl-6 fade-in">
+    <div class="panel-card h-100">
+      <div class="panel-card-title"><i class="bi bi-calendar-range" style="color:var(--accent2);"></i> Manager Timeline</div>
+      <div class="timeline-list">
+        {% for item in timeline_projects %}
+        <div class="timeline-item">
+          <div class="timeline-copy">
+            <div class="timeline-title">{{ item.project.name }}</div>
+            <div class="timeline-dates">{{ item.start_label }} to {{ item.end_label }}</div>
+          </div>
+          <div class="timeline-bar">
+            <div class="timeline-bar-fill" data-progress-width="{{ item.elapsed_percent }}"></div>
+          </div>
+          <div class="timeline-percent">{{ item.elapsed_percent }}%</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="col-12 col-xl-6 fade-in">
+    <div class="panel-card h-100">
+      <div class="section-hdr">
+        <div class="panel-card-title" style="margin-bottom:0;"><i class="bi bi-people"
+            style="color:var(--accent2);"></i> Team</div>
       </div>
 
-      {% if timeline_projects %}
-      <div class="col-12 fade-in">
-        <div class="panel-card">
-          <div class="panel-card-title"><i class="bi bi-calendar-range" style="color:var(--accent2);"></i> Manager Timeline</div>
-          <div class="timeline-list">
-            {% for item in timeline_projects %}
-            <div class="timeline-item">
-              <div class="timeline-copy">
-                <div class="timeline-title">{{ item.project.name }}</div>
-                <div class="timeline-dates">{{ item.start_label }} to {{ item.end_label }}</div>
-              </div>
-              <div class="timeline-bar">
-                <div class="timeline-bar-fill" data-progress-width="{{ item.elapsed_percent }}"></div>
-              </div>
-              <div class="timeline-percent">{{ item.elapsed_percent }}%</div>
+      <div style="margin-top:14px;">
+        {% for member in team_members %}
+        <div class="team-member">
+          <div class="member-avatar-shell">
+            <div class="act-ava team-member-avatar {{ member.badge_class }}" data-avatar-user-id="{{ member.user.id }}" data-avatar-initials="{{ member.user.initials }}">{% if member.user.avatar_url %}<img src="{{ member.user.avatar_url }}" alt="{{ member.user.display_name }}" class="avatar-media avatar-media-cover">{% else %}{{ member.user.initials }}{% endif %}</div>
+            <div class="member-hover-card">
+              <div class="member-hover-name">{{ member.user.display_name }}</div>
+              <div class="member-hover-role">{{ member.role }}</div>
             </div>
-            {% endfor %}
           </div>
+          <div class="team-member-copy">
+            <div class="member-name">{{ member.user.display_name }}</div>
+            <div class="member-role">{{ member.project.name }}</div>
+          </div>
+          <span class="team-role-badge {{ member.badge_class }}">{{ member.role }}</span>
         </div>
+        {% empty %}
+        <p style="margin:0;color:var(--muted);font-size:13px;">No team members found.</p>
+        {% endfor %}
       </div>
-      {% endif %}
-
-      <div class="col-12 fade-in">
-        <div class="panel-card">
-          <div class="section-hdr">
-            <div class="panel-card-title" style="margin-bottom:0;"><i class="bi bi-people"
-                style="color:var(--accent2);"></i> Team</div>
-          </div>
-
-          <div style="margin-top:14px;">
-            {% for member in team_members %}
-            <div class="team-member">
-              <div class="member-avatar-shell">
-                <div class="act-ava team-member-avatar" style="background:var(--accent);" data-avatar-user-id="{{ member.user.id }}" data-avatar-initials="{{ member.user.initials }}">{% if member.user.avatar_url %}<img src="{{ member.user.avatar_url }}" alt="{{ member.user.display_name }}" class="avatar-media avatar-media-cover">{% else %}{{ member.user.initials }}{% endif %}</div>
-                <div class="member-hover-card">
-                  <div class="member-hover-name">{{ member.user.display_name }}</div>
-                  <div class="member-hover-role">{{ member.role }}</div>
-                </div>
-              </div>
-              <div class="team-member-copy">
-                <div class="member-name">{{ member.user.display_name }}</div>
-                <div class="member-role">{{ member.project.name }}</div>
-              </div>
-              <span class="team-role-badge {{ member.badge_class }}">{{ member.role }}</span>
-            </div>
-            {% empty %}
-            <p style="margin:0;color:var(--muted);font-size:13px;">No team members found.</p>
-            {% endfor %}
-          </div>
-        </div>
-      </div>
-
     </div>
   </div>
 </div>
