@@ -109,8 +109,7 @@
                                     </div>
 
                                     <div class="match-task-meta">
-                                        <span><i class="bi bi-calendar3"></i> {% if task.due_date %}{{ task.due_date|date:"M j" }}{%
-                                            else %}No date{% endif %}</span>
+                                        <span><i class="bi bi-calendar3"></i> {% if task.due_date %}{{ task.due_date|date:"M j" }}{% else %}No date{% endif %}</span>
                                         {% if task.status == 'completed' %}
                                         <span class="match-done"><i class="bi bi-check-circle-fill"></i> Done</span>
                                         {% else %}
