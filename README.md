@@ -8,6 +8,8 @@ This is a Django-based **project management tool** called **Taskly**.
   Your browser does not support the video tag.
 </video>
 
+[Open the demonstration video](./video/demonstration.mp4)
+
 ---
 ## Prerequisites
 
