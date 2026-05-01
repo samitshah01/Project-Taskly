@@ -2,6 +2,12 @@
 
 This is a Django-based **project management tool** called **Taskly**.
 
+## Project Taskly Demonstration
+
+<video src="./video/demonstration.mp4" controls width="100%">
+  Your browser does not support the video tag.
+</video>
+
 ---
 ## Prerequisites
 
