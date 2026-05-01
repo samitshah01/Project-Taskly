@@ -134,7 +134,7 @@
             <article class="workspace-stat-card">
                 <span class="workspace-stat-label">Recorded Revenue</span>
                 <strong class="workspace-stat-value">${{ income_total }}</strong>
-                <span class="workspace-stat-foot">{{ income_transaction_count }} income transaction{{ income_transaction_count|pluralize }}</span>
+                <span class="workspace-stat-foot">Includes ${{ income_budget_total }} in project budgets and {{ income_transaction_count }} income transaction{{ income_transaction_count|pluralize }}</span>
             </article>
             <article class="workspace-stat-card">
                 <span class="workspace-stat-label">Recorded Expenses</span>
@@ -199,7 +199,7 @@
                         <div class="income-project-head">
                             <div>
                                 <h3>{{ item.project_name }}</h3>
-                                <p>{{ item.count }} transaction{{ item.count|pluralize }}</p>
+                                <p>{% if item.budget_amount %}${{ item.budget_amount }} budget{% if item.count %} + {% endif %}{% endif %}{{ item.count }} transaction{{ item.count|pluralize }}</p>
                             </div>
                             <strong>${{ item.total }}</strong>
                         </div>

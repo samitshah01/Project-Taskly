@@ -1695,12 +1695,15 @@ def income_visualization(request):
     project_filter = request.GET.get('project', '').strip()
 
     finance_entries = Expense.objects.select_related('project').filter(project__in=finance_projects)
+    filtered_projects = finance_projects
+    if project_filter:
+        filtered_projects = finance_projects.filter(id=project_filter)
+        finance_entries = finance_entries.filter(project_id=project_filter)
+
     incomes = finance_entries.filter(transaction_type=Expense.TYPE_INCOME)
 
-    if project_filter:
-        incomes = incomes.filter(project_id=project_filter)
-
-    if status_filter in {choice[0] for choice in Expense.PAYMENT_STATUS_CHOICES}:
+    valid_statuses = {choice[0] for choice in Expense.PAYMENT_STATUS_CHOICES}
+    if status_filter in valid_statuses:
         incomes = incomes.filter(status=status_filter)
 
     if search_query:
@@ -1711,15 +1714,35 @@ def income_visualization(request):
             | Q(project__name__icontains=search_query)
         )
 
+    visible_projects = list(filtered_projects)
+    project_budget_map = {}
+    budget_month_map = {}
+    project_start_months = []
+    project_budget_total = Decimal('0')
+    for project in visible_projects:
+        budget_amount = project.budget or Decimal('0')
+        project_budget_map[project.id] = budget_amount
+        project_budget_total += budget_amount
+
+        start_month = project.start_date.replace(day=1) if project.start_date else None
+        if start_month:
+            project_start_months.append(start_month)
+            if budget_amount:
+                budget_month_map[start_month] = budget_month_map.get(start_month, Decimal('0')) + budget_amount
+
     income_list = list(incomes.order_by('-issue_date', '-created_at'))
     income_rows, income_total, _, _, income_net_total = build_finance_rows(income_list)
+    income_total += project_budget_total
     paid_income_total = sum(item['amount'] for item in income_rows if item['status'] == Expense.STATUS_PAID)
     pending_income_total = sum(item['amount'] for item in income_rows if item['status'] != Expense.STATUS_PAID)
     total_expense_amount = finance_entries.filter(transaction_type=Expense.TYPE_EXPENSE).aggregate(total=Sum('amount'))['total'] or Decimal('0')
     total_profit_amount = income_total - total_expense_amount
 
     current_month = timezone.localdate().replace(day=1)
-    monthly_income_total = incomes.filter(issue_date__gte=current_month).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    monthly_income_total = (
+        (incomes.filter(issue_date__gte=current_month).aggregate(total=Sum('amount'))['total'] or Decimal('0'))
+        + budget_month_map.get(current_month, Decimal('0'))
+    )
     monthly_expense_total = finance_entries.filter(
         transaction_type=Expense.TYPE_EXPENSE,
         issue_date__gte=current_month,
@@ -1731,17 +1754,47 @@ def income_visualization(request):
         .annotate(total=Sum('amount'), count=Count('id'))
         .order_by('-total', 'project__name')
     )
-    highest_project_total = max((item['total'] or Decimal('0') for item in project_totals_qs), default=Decimal('0'))
-    project_income_rows = []
+    project_totals_map = {
+        project.id: {
+            'project_id': project.id,
+            'project_name': project.name,
+            'project_color': project.color or '#4f7cff',
+            'total': project_budget_map.get(project.id, Decimal('0')),
+            'count': 0,
+            'budget_amount': project_budget_map.get(project.id, Decimal('0')),
+        }
+        for project in visible_projects
+    }
     for item in project_totals_qs:
+        row = project_totals_map.setdefault(item['project_id'], {
+            'project_id': item['project_id'],
+            'project_name': item['project__name'],
+            'project_color': item['project__color'] or '#4f7cff',
+            'total': Decimal('0'),
+            'count': 0,
+            'budget_amount': Decimal('0'),
+        })
+        row['project_name'] = item['project__name']
+        row['project_color'] = item['project__color'] or row['project_color']
+        row['total'] += item['total'] or Decimal('0')
+        row['count'] = item['count']
+
+    ordered_project_totals = sorted(
+        project_totals_map.values(),
+        key=lambda item: (-(item['total'] or Decimal('0')), item['project_name'].lower()),
+    )
+    highest_project_total = max((item['total'] or Decimal('0') for item in ordered_project_totals), default=Decimal('0'))
+    project_income_rows = []
+    for item in ordered_project_totals:
         total = item['total'] or Decimal('0')
         percent = round((total / highest_project_total) * 100) if highest_project_total else 0
         project_income_rows.append({
             'project_id': item['project_id'],
-            'project_name': item['project__name'],
-            'project_color': item['project__color'] or '#4f7cff',
+            'project_name': item['project_name'],
+            'project_color': item['project_color'] or '#4f7cff',
             'total': total,
             'count': item['count'],
+            'budget_amount': item['budget_amount'],
             'percent': percent,
         })
 
@@ -1751,15 +1804,19 @@ def income_visualization(request):
         .annotate(total=Sum('amount'), count=Count('id'))
         .order_by('month')
     )
-    highest_month_total = max((item['total'] or Decimal('0') for item in month_totals_qs), default=Decimal('0'))
+    income_month_map = {item['month']: item['total'] or Decimal('0') for item in month_totals_qs if item['month']}
+    income_month_count_map = {item['month']: item['count'] for item in month_totals_qs if item['month']}
+    for month, budget_total in budget_month_map.items():
+        income_month_map[month] = income_month_map.get(month, Decimal('0')) + budget_total
+    highest_month_total = max(income_month_map.values(), default=Decimal('0'))
     monthly_income_rows = []
-    for item in month_totals_qs[-6:]:
-        total = item['total'] or Decimal('0')
+    for month in sorted(income_month_map.keys())[-6:]:
+        total = income_month_map.get(month, Decimal('0'))
         percent = round((total / highest_month_total) * 100) if highest_month_total else 0
         monthly_income_rows.append({
-            'label': item['month'].strftime('%b %Y') if item['month'] else 'No date',
+            'label': month.strftime('%b %Y'),
             'total': total,
-            'count': item['count'],
+            'count': income_month_count_map.get(month, 0),
             'percent': percent,
         })
 
@@ -1770,22 +1827,33 @@ def income_visualization(request):
         .annotate(total=Sum('amount'))
         .order_by('month')
     )
-    expense_month_map = {item['month']: item['total'] or Decimal('0') for item in monthly_expense_totals_qs}
-    income_month_map = {item['month']: item['total'] or Decimal('0') for item in month_totals_qs}
-    combined_months = sorted({*income_month_map.keys(), *expense_month_map.keys()})
-    combined_months = [month for month in combined_months if month][-12:]
-    if len(combined_months) < 6:
-        fallback_months = []
-        cursor = current_month
-        for step in range(5, -1, -1):
-            month_anchor = cursor.replace(day=1)
-            year = month_anchor.year
-            month = month_anchor.month - step
-            while month <= 0:
-                month += 12
-                year -= 1
-            fallback_months.append(date(year, month, 1))
-        combined_months = fallback_months
+    expense_month_map = {item['month']: item['total'] or Decimal('0') for item in monthly_expense_totals_qs if item['month']}
+
+    def iter_months(start_month, end_month):
+        cursor = start_month
+        while cursor <= end_month:
+            yield cursor
+            next_month = cursor.month + 1
+            next_year = cursor.year
+            if next_month > 12:
+                next_month = 1
+                next_year += 1
+            cursor = date(next_year, next_month, 1)
+
+    chart_month_candidates = [
+        *income_month_map.keys(),
+        *expense_month_map.keys(),
+        *budget_month_map.keys(),
+        current_month,
+    ]
+    first_project_month = min(project_start_months, default=None)
+    last_chart_month = max(chart_month_candidates, default=current_month)
+    if first_project_month:
+        combined_months = list(iter_months(first_project_month, last_chart_month))
+    else:
+        combined_months = sorted({month for month in chart_month_candidates if month})
+    combined_months = combined_months[-12:]
+
     pnl_max_total = max(
         [income_month_map.get(month, Decimal('0')) + expense_month_map.get(month, Decimal('0')) for month in combined_months],
         default=Decimal('0')
@@ -1812,7 +1880,10 @@ def income_visualization(request):
         })
 
     previous_month_start = (current_month.replace(day=1) - timedelta(days=1)).replace(day=1)
-    previous_month_income_total = incomes.filter(issue_date__gte=previous_month_start, issue_date__lt=current_month).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    previous_month_income_total = (
+        (incomes.filter(issue_date__gte=previous_month_start, issue_date__lt=current_month).aggregate(total=Sum('amount'))['total'] or Decimal('0'))
+        + budget_month_map.get(previous_month_start, Decimal('0'))
+    )
     previous_month_expense_total = finance_entries.filter(
         transaction_type=Expense.TYPE_EXPENSE,
         issue_date__gte=previous_month_start,
@@ -1832,6 +1903,7 @@ def income_visualization(request):
     context.update({
         'income_rows': income_rows,
         'income_total': income_total,
+        'income_budget_total': project_budget_total,
         'income_paid_total': paid_income_total,
         'income_pending_total': pending_income_total,
         'income_month_total': monthly_income_total,
